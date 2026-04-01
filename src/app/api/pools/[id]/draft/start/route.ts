@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
-import { espnProvider } from '@/lib/scores/espn'
 import { MASTERS_FIELD } from '@/lib/data/masters-field'
 
 export async function POST(
@@ -56,13 +55,9 @@ export async function POST(
     .eq('pool_id', params.id)
 
   if (!count || count === 0) {
-    let golfers: { id: string; name: string; world_ranking: number | null }[]
-    try {
-      golfers = await espnProvider.getFieldGolfers('')
-      if (golfers.length === 0) throw new Error('Empty field')
-    } catch {
-      golfers = MASTERS_FIELD
-    }
+    // Use the curated Masters field as the primary source.
+    // ESPN returns whatever PGA event is current, not necessarily the Masters.
+    const golfers = MASTERS_FIELD
 
     for (const golfer of golfers) {
       await supabase
