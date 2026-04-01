@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getTeamForPick } from '@/lib/utils/snake-draft'
@@ -24,6 +24,7 @@ export default function DraftPage() {
   const [loading, setLoading] = useState(true)
   const [picking, setPicking] = useState(false)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
+  const [autoPickTriggered, setAutoPickTriggered] = useState(false)
 
   const loadData = useCallback(async () => {
     const [poolRes, teamsRes, draftRes, picksRes, golfersRes] = await Promise.all([
@@ -84,6 +85,15 @@ export default function DraftPage() {
     }
   }, [pool?.status, poolId, router])
 
+  // Reset auto-pick flag when the pick advances
+  const prevPickRef = useRef(draftState?.current_pick)
+  useEffect(() => {
+    if (draftState?.current_pick !== prevPickRef.current) {
+      prevPickRef.current = draftState?.current_pick
+      setAutoPickTriggered(false)
+    }
+  }, [draftState?.current_pick])
+
   if (loading || !pool || !draftState) {
     return (
       <main className="min-h-screen flex items-center justify-center">
@@ -118,10 +128,24 @@ export default function DraftPage() {
         alert(data.error)
       }
       setSearch('')
+      await loadData()
     } catch {
       alert('Failed to make pick')
     }
     setPicking(false)
+  }
+
+  async function autoPickBestAvailable() {
+    if (autoPickTriggered || picking) return
+    setAutoPickTriggered(true)
+    // Pick the highest-ranked available golfer (already sorted by world_ranking)
+    const pickedIds = new Set(picks.map(p => p.golfer_id))
+    const best = golfers
+      .filter(g => !pickedIds.has(g.golfer_id))
+      .sort((a, b) => (a.world_ranking || 999) - (b.world_ranking || 999))[0]
+    if (best) {
+      await makePick(best.golfer_id, best.golfer_name)
+    }
   }
 
   const rounds = pool.players_per_team
@@ -158,7 +182,9 @@ export default function DraftPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm opacity-75">
-                  {isMyTurn ? MILESTONE_COPY.yourTurn : `${pickingTeam.owner_name} is picking...`}
+                  {timeLeft === 0
+                    ? `Time's up! Auto-picking for ${pickingTeam.owner_name}...`
+                    : isMyTurn ? MILESTONE_COPY.yourTurn : `${pickingTeam.owner_name} is picking...`}
                 </div>
                 <div className="text-lg font-serif font-bold">
                   Round {currentPickInfo?.round}
@@ -166,10 +192,20 @@ export default function DraftPage() {
               </div>
               {timeLeft !== null && (
                 <div className={`text-3xl font-mono font-bold ${timeLeft <= 10 ? 'text-score-red' : ''}`}>
-                  {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                  {timeLeft === 0 ? '0:00' : `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`}
                 </div>
               )}
             </div>
+            {timeLeft === 0 && isCommissioner && !autoPickTriggered && (
+              <div className="mt-2">
+                <button
+                  onClick={autoPickBestAvailable}
+                  className="bg-masters-gold text-augusta-dark px-4 py-1 rounded-sm text-sm font-semibold"
+                >
+                  Auto-pick best available
+                </button>
+              </div>
+            )}
           </div>
         )}
 
