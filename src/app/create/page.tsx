@@ -1,0 +1,229 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+
+interface PayoutRule {
+  position: number
+  percentage: number
+}
+
+export default function CreatePool() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    poolName: '',
+    commissionerName: '',
+    playersPerTeam: 6,
+    scoringPlayers: 5,
+    missedCutScore: 80,
+    dropDeadlineRound: 2,
+    draftTimerSeconds: 90,
+    buyInAmount: 50,
+  })
+  const [payoutRules, setPayoutRules] = useState<PayoutRule[]>([
+    { position: 1, percentage: 60 },
+    { position: 2, percentage: 25 },
+    { position: 3, percentage: 15 },
+  ])
+
+  const totalPercentage = payoutRules.reduce((sum, r) => sum + r.percentage, 0)
+
+  function addPayoutPosition() {
+    const nextPosition = payoutRules.length + 1
+    setPayoutRules([...payoutRules, { position: nextPosition, percentage: 0 }])
+  }
+
+  function removePayoutPosition(index: number) {
+    const updated = payoutRules.filter((_, i) => i !== index)
+      .map((r, i) => ({ ...r, position: i + 1 }))
+    setPayoutRules(updated)
+  }
+
+  function updatePayoutPercentage(index: number, percentage: number) {
+    const updated = [...payoutRules]
+    updated[index] = { ...updated[index], percentage }
+    setPayoutRules(updated)
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (totalPercentage !== 100) {
+      alert('Payout percentages must sum to 100%')
+      return
+    }
+    setLoading(true)
+
+    try {
+      const res = await fetch('/api/pools', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, payoutRules }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      router.push(`/pool/${data.pool.id}`)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to create pool')
+      setLoading(false)
+    }
+  }
+
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-augusta focus:border-transparent"
+
+  return (
+    <main className="min-h-screen py-8 px-4">
+      <div className="max-w-xl mx-auto">
+        <h1 className="text-3xl font-serif font-bold text-augusta mb-8">Create Your Pool</h1>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Pool Name</label>
+            <input
+              type="text"
+              required
+              value={formData.poolName}
+              onChange={e => setFormData({ ...formData, poolName: e.target.value })}
+              placeholder="e.g., The Amen Corner Invitational"
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Your Name (Commissioner)</label>
+            <input
+              type="text"
+              required
+              value={formData.commissionerName}
+              onChange={e => setFormData({ ...formData, commissionerName: e.target.value })}
+              placeholder="Your name"
+              className={inputClass}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Golfers Per Team</label>
+              <input
+                type="number"
+                min={2}
+                max={10}
+                value={formData.playersPerTeam}
+                onChange={e => setFormData({ ...formData, playersPerTeam: parseInt(e.target.value) })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Scoring Golfers</label>
+              <input
+                type="number"
+                min={1}
+                max={formData.playersPerTeam}
+                value={formData.scoringPlayers}
+                onChange={e => setFormData({ ...formData, scoringPlayers: parseInt(e.target.value) })}
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Missed Cut Score</label>
+              <input
+                type="number"
+                value={formData.missedCutScore}
+                onChange={e => setFormData({ ...formData, missedCutScore: parseInt(e.target.value) })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Drop After Round</label>
+              <input
+                type="number"
+                min={1}
+                max={3}
+                value={formData.dropDeadlineRound}
+                onChange={e => setFormData({ ...formData, dropDeadlineRound: parseInt(e.target.value) })}
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Draft Timer (seconds)</label>
+              <input
+                type="number"
+                min={30}
+                max={300}
+                value={formData.draftTimerSeconds}
+                onChange={e => setFormData({ ...formData, draftTimerSeconds: parseInt(e.target.value) })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Buy-in ($)</label>
+              <input
+                type="number"
+                min={0}
+                value={formData.buyInAmount}
+                onChange={e => setFormData({ ...formData, buyInAmount: parseInt(e.target.value) })}
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          {/* Payout Rules */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Payout Structure</label>
+            <div className="space-y-2">
+              {payoutRules.map((rule, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-sm text-muted-gray w-12">#{rule.position}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={rule.percentage}
+                    onChange={e => updatePayoutPercentage(i, parseInt(e.target.value) || 0)}
+                    className="w-24 px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-augusta focus:border-transparent"
+                  />
+                  <span className="text-sm text-muted-gray">%</span>
+                  {payoutRules.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removePayoutPosition(i)}
+                      className="text-score-red text-sm hover:text-red-700"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-4 mt-2">
+              <button
+                type="button"
+                onClick={addPayoutPosition}
+                className="text-sm text-augusta hover:text-augusta-dark font-medium"
+              >
+                + Add Position
+              </button>
+              <span className={`text-sm ${totalPercentage === 100 ? 'text-score-green' : 'text-score-red'}`}>
+                Total: {totalPercentage}%
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || totalPercentage !== 100}
+            className="w-full bg-augusta text-white py-3 px-6 rounded-sm font-semibold hover:bg-augusta-dark transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Creating...' : 'Create Pool'}
+          </button>
+        </form>
+      </div>
+    </main>
+  )
+}
