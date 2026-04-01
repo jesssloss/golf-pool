@@ -57,6 +57,18 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Check for duplicate name in this pool
+  const { data: duplicateName } = await supabase
+    .from('teams')
+    .select('id')
+    .eq('pool_id', pool.id)
+    .eq('owner_name', playerName)
+    .single()
+
+  if (duplicateName) {
+    return NextResponse.json({ error: 'Someone with that name is already in this pool. Try a different name.' }, { status: 400 })
+  }
+
   const sessionToken = crypto.randomUUID()
 
   const { error: teamError } = await supabase
