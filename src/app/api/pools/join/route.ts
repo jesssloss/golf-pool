@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (existingTeam) {
-      return NextResponse.json({ pool_id: pool.id })
+      return NextResponse.json({ pool_id: pool.id, already_member: true })
     }
   }
 

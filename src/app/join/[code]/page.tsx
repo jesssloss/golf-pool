@@ -12,6 +12,7 @@ export default function JoinPool() {
   const [poolName, setPoolName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [alreadyMember, setAlreadyMember] = useState(false)
 
   // Fetch pool name for the badge
   useEffect(() => {
@@ -46,6 +47,11 @@ export default function JoinPool() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
+      if (data.already_member) {
+        setAlreadyMember(true)
+        setTimeout(() => router.push(`/pool/${data.pool_id}`), 1500)
+        return
+      }
       router.push(`/pool/${data.pool_id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join pool')
@@ -63,6 +69,12 @@ export default function JoinPool() {
             playerName={name || undefined}
           />
         </div>
+
+        {alreadyMember && (
+          <div className="bg-cream-dark text-augusta p-3 rounded-sm mb-4 text-sm font-serif italic">
+            Welcome back, patron. Taking you to your pool...
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-50 text-score-red p-3 rounded-sm mb-4 text-sm">{error}</div>
