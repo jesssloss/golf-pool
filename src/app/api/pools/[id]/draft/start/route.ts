@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
+import { espnProvider } from '@/lib/scores/espn'
+import { MASTERS_FIELD } from '@/lib/data/masters-field'
 
 export async function POST(
   request: NextRequest,
@@ -44,6 +46,38 @@ export async function POST(
         .from('teams')
         .update({ draft_position: i + 1 })
         .eq('id', teams[i].id)
+    }
+  }
+
+  // Auto-load golfer field if not already loaded
+  const { count } = await supabase
+    .from('golfer_scores')
+    .select('*', { count: 'exact', head: true })
+    .eq('pool_id', params.id)
+
+  if (!count || count === 0) {
+    let golfers: { id: string; name: string; world_ranking: number | null }[]
+    try {
+      golfers = await espnProvider.getFieldGolfers('')
+      if (golfers.length === 0) throw new Error('Empty field')
+    } catch {
+      golfers = MASTERS_FIELD
+    }
+
+    for (const golfer of golfers) {
+      await supabase
+        .from('golfer_scores')
+        .upsert(
+          {
+            pool_id: params.id,
+            golfer_id: golfer.id,
+            golfer_name: golfer.name,
+            round_number: null,
+            total_to_par: 0,
+            world_ranking: golfer.world_ranking,
+          },
+          { onConflict: 'pool_id,golfer_id,round_number' }
+        )
     }
   }
 
