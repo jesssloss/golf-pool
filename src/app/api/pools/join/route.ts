@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
   // Check if player already has a session for this pool
   const cookieStore = cookies()
-  const existingToken = cookieStore.get('session_token')?.value
+  const existingToken = cookieStore.get(`session_token_${pool.id}`)?.value
   if (existingToken) {
     const { data: existingTeam } = await supabase
       .from('teams')
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: teamError.message }, { status: 500 })
   }
 
-  cookieStore.set('session_token', sessionToken, {
+  cookieStore.set(`session_token_${pool.id}`, sessionToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

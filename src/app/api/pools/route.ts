@@ -77,9 +77,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: teamError.message }, { status: 500 })
   }
 
-  // Set session cookie
+  // Set session cookie scoped to this pool
   const cookieStore = cookies()
-  cookieStore.set('session_token', sessionToken, {
+  cookieStore.set(`session_token_${pool.id}`, sessionToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

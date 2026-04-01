@@ -7,7 +7,7 @@ export async function POST(
   { params }: { params: { id: string; teamId: string } }
 ) {
   const cookieStore = cookies()
-  const sessionToken = cookieStore.get('session_token')?.value
+  const sessionToken = cookieStore.get(`session_token_${params.id}`)?.value
   const supabase = createServerSupabaseClient()
 
   // Verify commissioner

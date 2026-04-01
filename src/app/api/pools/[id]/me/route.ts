@@ -7,7 +7,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const cookieStore = cookies()
-  const sessionToken = cookieStore.get('session_token')?.value
+  const sessionToken = cookieStore.get(`session_token_${params.id}`)?.value
 
   if (!sessionToken) {
     return NextResponse.json({ team: null })
