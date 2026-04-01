@@ -25,6 +25,7 @@ export default function DraftPage() {
   const [picking, setPicking] = useState(false)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [autoPickTriggered, setAutoPickTriggered] = useState(false)
+  const [pendingPick, setPendingPick] = useState<{ golfer_id: string; golfer_name: string } | null>(null)
 
   const loadData = useCallback(async () => {
     const [poolRes, teamsRes, draftRes, picksRes, golfersRes] = await Promise.all([
@@ -60,7 +61,13 @@ export default function DraftPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pools', filter: `id=eq.${poolId}` }, () => loadData())
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    // Polling fallback in case Realtime isn't connected
+    const pollInterval = setInterval(loadData, 3000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(pollInterval)
+    }
   }, [poolId, supabase, loadData])
 
   useEffect(() => {
@@ -85,12 +92,13 @@ export default function DraftPage() {
     }
   }, [pool?.status, poolId, router])
 
-  // Reset auto-pick flag when the pick advances
+  // Reset state when the pick advances
   const prevPickRef = useRef(draftState?.current_pick)
   useEffect(() => {
     if (draftState?.current_pick !== prevPickRef.current) {
       prevPickRef.current = draftState?.current_pick
       setAutoPickTriggered(false)
+      setPendingPick(null)
     }
   }, [draftState?.current_pick])
 
@@ -253,6 +261,34 @@ export default function DraftPage() {
 
           {/* Golfer picker */}
           <div className="bg-white rounded-sm border border-muted-gray/20">
+            {/* Pending pick confirmation bar */}
+            {pendingPick && (isMyTurn || isCommissioner) && (
+              <div className="p-3 bg-masters-gold/20 border-b-2 border-masters-gold">
+                <div className="text-sm font-serif font-semibold text-augusta mb-2">
+                  {pendingPick.golfer_name}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    disabled={picking}
+                    onClick={() => {
+                      makePick(pendingPick.golfer_id, pendingPick.golfer_name)
+                      setPendingPick(null)
+                    }}
+                    className="flex-1 bg-augusta text-white py-2 px-4 rounded-sm text-sm font-semibold hover:bg-augusta-dark transition-colors disabled:opacity-50"
+                  >
+                    {picking ? 'Confirming...' : 'Confirm Pick'}
+                  </button>
+                  <button
+                    disabled={picking}
+                    onClick={() => setPendingPick(null)}
+                    className="px-4 py-2 border border-muted-gray/30 text-muted-gray rounded-sm text-sm hover:bg-cream transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="p-3 border-b border-muted-gray/20">
               <input
                 type="text"
@@ -263,19 +299,26 @@ export default function DraftPage() {
               />
             </div>
             <div className="max-h-96 overflow-y-auto">
-              {availableGolfers.map(g => (
-                <button
-                  key={g.golfer_id}
-                  disabled={(!isMyTurn && !isCommissioner) || picking}
-                  onClick={() => makePick(g.golfer_id, g.golfer_name)}
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-cream disabled:opacity-50 disabled:hover:bg-white flex items-center justify-between border-b border-muted-gray/10"
-                >
-                  <span>{g.golfer_name}</span>
-                  {g.world_ranking && (
-                    <span className="text-xs text-muted-gray">#{g.world_ranking}</span>
-                  )}
-                </button>
-              ))}
+              {availableGolfers.map(g => {
+                const isSelected = pendingPick?.golfer_id === g.golfer_id
+                return (
+                  <button
+                    key={g.golfer_id}
+                    disabled={(!isMyTurn && !isCommissioner) || picking}
+                    onClick={() => setPendingPick({ golfer_id: g.golfer_id, golfer_name: g.golfer_name })}
+                    className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between border-b border-muted-gray/10 transition-colors ${
+                      isSelected
+                        ? 'bg-augusta/10 border-l-2 border-l-augusta font-semibold'
+                        : 'hover:bg-cream disabled:opacity-50 disabled:hover:bg-white'
+                    }`}
+                  >
+                    <span>{g.golfer_name}</span>
+                    {g.world_ranking && (
+                      <span className="text-xs text-muted-gray">#{g.world_ranking}</span>
+                    )}
+                  </button>
+                )
+              })}
               {availableGolfers.length === 0 && (
                 <div className="p-4 text-center text-muted-gray text-sm font-serif italic">
                   {golfers.length === 0 ? EMPTY_STATE_COPY.draftBoardEmpty : 'No golfers match your search'}

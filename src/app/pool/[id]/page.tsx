@@ -46,13 +46,22 @@ export default function PoolPage() {
 
   useEffect(() => {
     const channel = supabase
-      .channel('teams-changes')
+      .channel('pool-lobby')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'teams', filter: `pool_id=eq.${poolId}` }, () => {
+        loadData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pools', filter: `id=eq.${poolId}` }, () => {
         loadData()
       })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    // Polling fallback in case Realtime isn't connected
+    const pollInterval = setInterval(loadData, 5000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(pollInterval)
+    }
   }, [poolId, supabase, loadData])
 
   if (loading) {
