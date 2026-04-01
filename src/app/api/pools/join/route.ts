@@ -3,10 +3,25 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 
 export async function POST(request: NextRequest) {
-  const { inviteCode, playerName } = await request.json()
+  const { inviteCode, playerName, peek } = await request.json()
 
-  if (!inviteCode || !playerName) {
-    return NextResponse.json({ error: 'Invite code and player name are required' }, { status: 400 })
+  if (!inviteCode) {
+    return NextResponse.json({ error: 'Invite code is required' }, { status: 400 })
+  }
+
+  // Peek mode: just return pool name for the join page badge
+  if (peek) {
+    const supabase = createServerSupabaseClient()
+    const { data: pool } = await supabase
+      .from('pools')
+      .select('name')
+      .eq('invite_code', inviteCode.toUpperCase())
+      .single()
+    return NextResponse.json({ pool_name: pool?.name || null })
+  }
+
+  if (!playerName) {
+    return NextResponse.json({ error: 'Player name is required' }, { status: 400 })
   }
 
   const supabase = createServerSupabaseClient()
