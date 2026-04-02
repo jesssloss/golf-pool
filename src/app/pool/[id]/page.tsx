@@ -67,7 +67,7 @@ export default function PoolPage() {
   if (loading) {
     return (
       <main className="min-h-screen flex items-center justify-center">
-        <p className="font-serif italic text-muted-gray">Loading...</p>
+        <p className="loading-pulse font-serif italic text-muted-gray">Loading...</p>
       </main>
     )
   }
@@ -177,7 +177,7 @@ export default function PoolPage() {
               </code>
               <button
                 onClick={() => navigator.clipboard.writeText(inviteUrl)}
-                className="px-3 py-2 bg-augusta text-white text-sm rounded-sm hover:bg-augusta-dark transition-colors whitespace-nowrap"
+                className="px-3 py-2 min-h-[44px] bg-augusta text-white text-sm rounded-sm hover:bg-augusta-dark transition-colors whitespace-nowrap"
               >
                 Copy
               </button>
@@ -214,7 +214,7 @@ export default function PoolPage() {
                   </div>
                   <button
                     onClick={() => togglePaid(team.id, team.buy_in_paid)}
-                    className={`text-xs px-2 py-1 rounded-sm ${
+                    className={`text-xs px-3 py-2 min-h-[44px] rounded-sm ${
                       team.buy_in_paid
                         ? 'bg-score-green/10 text-score-green'
                         : 'bg-gray-100 text-muted-gray'

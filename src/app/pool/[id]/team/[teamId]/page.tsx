@@ -22,6 +22,7 @@ export default function TeamDetail() {
   const [golfers, setGolfers] = useState<(TeamGolfer & { scores: GolferScore[] })[]>([])
   const [currentTeam, setCurrentTeam] = useState<Team | null>(null)
   const [dropping, setDropping] = useState(false)
+  const [confirmDropId, setConfirmDropId] = useState<string | null>(null)
   const [showTeamCard, setShowTeamCard] = useState(false)
 
   const loadData = useCallback(async () => {
@@ -52,7 +53,6 @@ export default function TeamDetail() {
   useEffect(() => { loadData() }, [loadData])
 
   async function dropGolfer(golferId: string) {
-    if (!confirm('Drop this golfer? This cannot be undone. Their scores will be excluded from ALL rounds.')) return
     setDropping(true)
     const res = await fetch(`/api/pools/${poolId}/teams/${teamId}/drop`, {
       method: 'POST',
@@ -61,12 +61,13 @@ export default function TeamDetail() {
     })
     if (res.ok) loadData()
     setDropping(false)
+    setConfirmDropId(null)
   }
 
   if (!pool || !team) {
     return (
       <main className="min-h-screen flex items-center justify-center">
-        <p className="font-serif italic text-muted-gray">Loading...</p>
+        <p className="loading-pulse font-serif italic text-muted-gray">Loading...</p>
       </main>
     )
   }
@@ -92,7 +93,7 @@ export default function TeamDetail() {
   return (
     <main className="min-h-screen py-4 px-4">
       <div className="max-w-3xl mx-auto">
-        <Link href={`/pool/${poolId}`} className="text-sm text-augusta hover:underline mb-4 block">
+        <Link href={`/pool/${poolId}`} className="text-sm text-augusta hover:underline mb-4 block min-h-[44px] flex items-center">
           Back to Leaderboard
         </Link>
 
@@ -117,7 +118,7 @@ export default function TeamDetail() {
                 <th className="px-2 py-2 text-center font-serif font-bold w-14">R3</th>
                 <th className="px-2 py-2 text-center font-serif font-bold w-14">{hasR4 ? 'Final' : 'R4'}</th>
                 <th className="px-2 py-2 text-center font-serif font-bold w-14">Total</th>
-                {canDrop && <th className="px-2 py-2 w-14"></th>}
+                {canDrop && <th className="px-2 py-2 w-20"></th>}
               </tr>
             </thead>
             <tbody>
@@ -130,6 +131,7 @@ export default function TeamDetail() {
                 const total = latestScore?.total_to_par || 0
                 const status = latestScore?.status || 'active'
                 const isMissedCut = ['cut', 'withdrawn', 'dq'].includes(status)
+                const isConfirmingDrop = confirmDropId === g.golfer_id
 
                 return (
                   <tr
@@ -168,14 +170,34 @@ export default function TeamDetail() {
                     </td>
                     {canDrop && (
                       <td className="px-2 py-3 text-center">
-                        {!g.is_dropped && (
+                        {!g.is_dropped && !isConfirmingDrop && (
                           <button
-                            onClick={() => dropGolfer(g.golfer_id)}
+                            onClick={() => setConfirmDropId(g.golfer_id)}
                             disabled={dropping}
-                            className="text-xs text-score-red hover:text-red-700 disabled:opacity-50"
+                            className="text-xs text-score-red hover:text-red-700 disabled:opacity-50 min-h-[44px] min-w-[44px] flex items-center justify-center mx-auto"
                           >
                             Drop
                           </button>
+                        )}
+                        {isConfirmingDrop && (
+                          <div className="space-y-1">
+                            <div className="text-[10px] text-score-red font-medium">Can&apos;t undo</div>
+                            <div className="flex gap-1 justify-center">
+                              <button
+                                onClick={() => dropGolfer(g.golfer_id)}
+                                disabled={dropping}
+                                className="text-xs bg-score-red text-white px-2 py-1 rounded-sm min-h-[36px] disabled:opacity-50"
+                              >
+                                {dropping ? '...' : 'Confirm'}
+                              </button>
+                              <button
+                                onClick={() => setConfirmDropId(null)}
+                                className="text-xs text-muted-gray px-2 py-1 rounded-sm min-h-[36px] hover:bg-cream"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </td>
                     )}
@@ -190,7 +212,7 @@ export default function TeamDetail() {
         <div className="mt-6 text-center">
           <button
             onClick={() => setShowTeamCard(!showTeamCard)}
-            className="text-sm text-augusta hover:underline"
+            className="text-sm text-augusta hover:underline min-h-[44px] px-4"
           >
             {showTeamCard ? 'Hide Team Card' : 'View Team Card'}
           </button>
