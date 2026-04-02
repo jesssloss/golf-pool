@@ -11,6 +11,8 @@ interface PayoutRule {
 export default function CreatePool() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [formData, setFormData] = useState({
     poolName: '',
     commissionerName: '',
@@ -49,9 +51,10 @@ export default function CreatePool() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (totalPercentage !== 100) {
-      alert('Payout percentages must sum to 100%')
+      setError('Payout percentages must sum to 100%')
       return
     }
+    setError('')
     setLoading(true)
 
     try {
@@ -64,7 +67,7 @@ export default function CreatePool() {
       if (!res.ok) throw new Error(data.error)
       router.push(`/pool/${data.pool.id}`)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to create pool')
+      setError(err instanceof Error ? err.message : 'Failed to create pool')
       setLoading(false)
     }
   }
@@ -75,6 +78,10 @@ export default function CreatePool() {
     <main className="min-h-screen py-8 px-4">
       <div className="max-w-xl mx-auto">
         <h1 className="text-3xl font-serif font-bold text-augusta mb-8">Create Your Pool</h1>
+
+        {error && (
+          <div className="bg-red-50 text-score-red p-3 rounded-sm mb-4 text-sm">{error}</div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
@@ -101,76 +108,15 @@ export default function CreatePool() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Golfers Per Team</label>
-              <input
-                type="number"
-                min={2}
-                max={10}
-                value={formData.playersPerTeam}
-                onChange={e => setFormData({ ...formData, playersPerTeam: parseInt(e.target.value) })}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Scoring Golfers</label>
-              <input
-                type="number"
-                min={1}
-                max={formData.playersPerTeam}
-                value={formData.scoringPlayers}
-                onChange={e => setFormData({ ...formData, scoringPlayers: parseInt(e.target.value) })}
-                className={inputClass}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Missed Cut Score</label>
-              <input
-                type="number"
-                value={formData.missedCutScore}
-                onChange={e => setFormData({ ...formData, missedCutScore: parseInt(e.target.value) })}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Drop After Round</label>
-              <input
-                type="number"
-                min={1}
-                max={3}
-                value={formData.dropDeadlineRound}
-                onChange={e => setFormData({ ...formData, dropDeadlineRound: parseInt(e.target.value) })}
-                className={inputClass}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Draft Timer (seconds)</label>
-              <input
-                type="number"
-                min={30}
-                max={300}
-                value={formData.draftTimerSeconds}
-                onChange={e => setFormData({ ...formData, draftTimerSeconds: parseInt(e.target.value) })}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Buy-in ($)</label>
-              <input
-                type="number"
-                min={0}
-                value={formData.buyInAmount}
-                onChange={e => setFormData({ ...formData, buyInAmount: parseInt(e.target.value) })}
-                className={inputClass}
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Buy-in ($)</label>
+            <input
+              type="number"
+              min={0}
+              value={formData.buyInAmount}
+              onChange={e => setFormData({ ...formData, buyInAmount: parseInt(e.target.value) })}
+              className={inputClass}
+            />
           </div>
 
           {/* Payout Rules */}
@@ -193,7 +139,7 @@ export default function CreatePool() {
                     <button
                       type="button"
                       onClick={() => removePayoutPosition(i)}
-                      className="text-score-red text-sm hover:text-red-700"
+                      className="text-score-red text-sm hover:text-red-700 min-h-[44px] min-w-[44px] flex items-center justify-center"
                     >
                       Remove
                     </button>
@@ -205,7 +151,7 @@ export default function CreatePool() {
               <button
                 type="button"
                 onClick={addPayoutPosition}
-                className="text-sm text-augusta hover:text-augusta-dark font-medium"
+                className="text-sm text-augusta hover:text-augusta-dark font-medium min-h-[44px] px-2"
               >
                 + Add Position
               </button>
@@ -213,6 +159,90 @@ export default function CreatePool() {
                 Total: {totalPercentage}%
               </span>
             </div>
+          </div>
+
+          {/* Advanced Settings */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-sm text-augusta hover:text-augusta-dark font-medium flex items-center gap-1 min-h-[44px]"
+            >
+              <span className={`inline-block transition-transform ${showAdvanced ? 'rotate-90' : ''}`}>&#9654;</span>
+              Advanced Settings
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-4 space-y-4 pl-4 border-l-2 border-cream-dark">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Golfers Per Team</label>
+                    <input
+                      type="number"
+                      min={2}
+                      max={10}
+                      value={formData.playersPerTeam}
+                      onChange={e => setFormData({ ...formData, playersPerTeam: parseInt(e.target.value) })}
+                      className={inputClass}
+                    />
+                    <p className="text-xs text-muted-gray mt-1">How many golfers each team drafts</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Scoring Golfers</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={formData.playersPerTeam}
+                      value={formData.scoringPlayers}
+                      onChange={e => setFormData({ ...formData, scoringPlayers: parseInt(e.target.value) })}
+                      className={inputClass}
+                    />
+                    <p className="text-xs text-muted-gray mt-1">Best N scores count toward your total</p>
+                    {formData.scoringPlayers > formData.playersPerTeam && (
+                      <p className="text-xs text-score-red mt-1">Must be less than or equal to golfers per team</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Missed Cut Score</label>
+                    <input
+                      type="number"
+                      value={formData.missedCutScore}
+                      onChange={e => setFormData({ ...formData, missedCutScore: parseInt(e.target.value) })}
+                      className={inputClass}
+                    />
+                    <p className="text-xs text-muted-gray mt-1">Score added per missed round (e.g. +80 for R3 and R4)</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Drop After Round</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={3}
+                      value={formData.dropDeadlineRound}
+                      onChange={e => setFormData({ ...formData, dropDeadlineRound: parseInt(e.target.value) })}
+                      className={inputClass}
+                    />
+                    <p className="text-xs text-muted-gray mt-1">Last round you can drop a golfer</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Draft Timer (seconds)</label>
+                  <input
+                    type="number"
+                    min={30}
+                    max={300}
+                    value={formData.draftTimerSeconds}
+                    onChange={e => setFormData({ ...formData, draftTimerSeconds: parseInt(e.target.value) })}
+                    className="w-full max-w-[200px] px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-augusta focus:border-transparent"
+                  />
+                  <p className="text-xs text-muted-gray mt-1">Time per pick before auto-draft kicks in</p>
+                </div>
+              </div>
+            )}
           </div>
 
           <button

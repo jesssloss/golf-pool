@@ -17,7 +17,7 @@ const config: Config = {
         'cream-dark': '#F5EDD6',
         'score-red': '#C41E3A',
         'score-green': '#006747',
-        'muted-gray': '#9CA3AF',
+        'muted-gray': '#6B7280',
       },
       fontFamily: {
         serif: ['var(--font-playfair)', 'Georgia', 'serif'],
