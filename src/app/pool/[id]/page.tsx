@@ -7,6 +7,7 @@ import type { Pool, Team, PayoutRule } from '@/types'
 import Leaderboard from '@/components/Leaderboard'
 import MilestoneBanner from '@/components/MilestoneBanner'
 import { MILESTONE_COPY, EMPTY_STATE_COPY } from '@/lib/constants/copy'
+import GreenJacketIcon from '@/components/GreenJacketIcon'
 
 export default function PoolPage() {
   const params = useParams()
@@ -66,8 +67,9 @@ export default function PoolPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <p className="loading-pulse font-serif italic text-muted-gray">Loading...</p>
+      <main className="min-h-screen flex flex-col items-center justify-center">
+        <GreenJacketIcon size={32} />
+        <p className="loading-pulse font-serif italic text-muted-gray mt-3">Loading...</p>
       </main>
     )
   }
@@ -137,19 +139,19 @@ export default function PoolPage() {
     <div className="bg-white rounded-sm p-4 mb-6 border border-muted-gray/20">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
         <div>
-          <div className="text-2xl font-serif font-bold text-augusta">${pool.buy_in_amount}</div>
+          <div className="text-2xl font-serif font-bold text-pimento">${pool.buy_in_amount}</div>
           <div className="text-xs text-muted-gray">Buy-in</div>
         </div>
         <div>
-          <div className="text-2xl font-serif font-bold text-augusta">{pool.players_per_team}</div>
+          <div className="text-2xl font-serif font-bold text-pimento">{pool.players_per_team}</div>
           <div className="text-xs text-muted-gray">Golfers/Team</div>
         </div>
         <div>
-          <div className="text-2xl font-serif font-bold text-augusta">{pool.scoring_players}</div>
+          <div className="text-2xl font-serif font-bold text-pimento">{pool.scoring_players}</div>
           <div className="text-xs text-muted-gray">Count Best</div>
         </div>
         <div>
-          <div className="text-2xl font-serif font-bold text-augusta">{pool.draft_timer_seconds}s</div>
+          <div className="text-2xl font-serif font-bold text-pimento">{pool.draft_timer_seconds}s</div>
           <div className="text-xs text-muted-gray">Draft Timer</div>
         </div>
       </div>
@@ -174,9 +176,12 @@ export default function PoolPage() {
     return (
       <main className="min-h-screen py-8 px-4">
         <div className="max-w-2xl mx-auto">
-          <div className="mb-2">
-            <h1 className="text-3xl font-serif font-bold text-augusta">{pool.name}</h1>
-            <p className="text-muted-gray mt-1">{pool.tournament_name}</p>
+          <div className="mb-2 flex items-center gap-3">
+            <GreenJacketIcon size={28} />
+            <div>
+              <h1 className="text-3xl font-serif font-bold text-pimento">{pool.name}</h1>
+              <p className="text-muted-gray mt-1">{pool.tournament_name}</p>
+            </div>
           </div>
 
           <MilestoneBanner text={MILESTONE_COPY.poolCreated} />
@@ -190,7 +195,7 @@ export default function PoolPage() {
               </code>
               <button
                 onClick={() => navigator.clipboard.writeText(inviteUrl)}
-                className="px-3 py-2 min-h-[44px] bg-augusta text-white text-sm rounded-sm hover:bg-augusta-dark transition-colors whitespace-nowrap"
+                className="px-3 py-2 min-h-[44px] bg-pimento text-white text-sm rounded-sm hover:bg-pimento-dark transition-colors whitespace-nowrap"
               >
                 Copy
               </button>
@@ -214,7 +219,8 @@ export default function PoolPage() {
             </div>
             {teams.length === 0 && (
               <div className="px-4 py-8 text-center">
-                <p className="font-serif italic text-muted-gray">{EMPTY_STATE_COPY.preDraftNoPlayers}</p>
+                <GreenJacketIcon size={24} />
+                <p className="font-serif italic text-muted-gray mt-2">{EMPTY_STATE_COPY.preDraftNoPlayers}</p>
               </div>
             )}
             <div className="divide-y divide-muted-gray/20">
@@ -225,7 +231,7 @@ export default function PoolPage() {
                     <span className="font-medium">
                       {team.owner_name}
                       {team.is_commissioner && (
-                        <span className="ml-2 text-xs bg-augusta text-white px-2 py-0.5 rounded-sm">
+                        <span className="ml-2 text-xs bg-pimento text-white px-2 py-0.5 rounded-sm">
                           Commissioner
                         </span>
                       )}
@@ -250,14 +256,14 @@ export default function PoolPage() {
           <div className="space-y-3">
             <button
               onClick={randomizeDraftOrder}
-              className="w-full py-3 px-6 border-2 border-augusta text-augusta rounded-sm font-semibold hover:bg-augusta hover:text-white transition-colors"
+              className="w-full py-3 px-6 border-2 border-pimento text-pimento rounded-sm font-semibold hover:bg-pimento hover:text-white transition-colors"
             >
               Randomize Draft Order
             </button>
             <button
               onClick={startDraft}
               disabled={teams.length < 2}
-              className="w-full py-3 px-6 bg-augusta text-white rounded-sm font-semibold hover:bg-augusta-dark transition-colors disabled:opacity-50"
+              className="w-full py-3 px-6 bg-pimento text-white rounded-sm font-semibold hover:bg-pimento-dark transition-colors disabled:opacity-50"
             >
               Start Draft
             </button>
@@ -274,14 +280,17 @@ export default function PoolPage() {
   return (
     <main className="min-h-screen py-8 px-4">
       <div className="max-w-2xl mx-auto">
-        <div className="mb-2">
-          <h1 className="text-3xl font-serif font-bold text-augusta">{pool.name}</h1>
-          <p className="text-muted-gray mt-1">{pool.tournament_name}</p>
+        <div className="mb-2 flex items-center gap-3">
+          <GreenJacketIcon size={28} />
+          <div>
+            <h1 className="text-3xl font-serif font-bold text-pimento">{pool.name}</h1>
+            <p className="text-muted-gray mt-1">{pool.tournament_name}</p>
+          </div>
         </div>
 
         {/* Participant status card */}
         {currentTeam ? (
-          <div className="bg-white rounded-sm p-4 mb-6 border border-augusta/30 mt-4">
+          <div className="bg-white rounded-sm p-4 mb-6 border border-pimento/30 mt-4">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm text-muted-gray">You&apos;re in</div>
@@ -290,7 +299,7 @@ export default function PoolPage() {
               {myDraftPosition && allHavePositions ? (
                 <div className="text-right">
                   <div className="text-sm text-muted-gray">Draft Position</div>
-                  <div className="text-3xl font-serif font-bold text-augusta">#{myDraftPosition}</div>
+                  <div className="text-3xl font-serif font-bold text-pimento">#{myDraftPosition}</div>
                 </div>
               ) : (
                 <div className="text-right">
@@ -307,10 +316,10 @@ export default function PoolPage() {
 
         {/* Payment instructions */}
         {currentTeam && !currentTeam.buy_in_paid && pool.buy_in_amount > 0 && (
-          <div className="bg-masters-gold/10 rounded-sm p-4 mb-6 border border-masters-gold/30">
+          <div className="bg-cheddar/10 rounded-sm p-4 mb-6 border border-cheddar/30">
             <div className="flex items-center justify-between mb-2">
               <div className="font-serif font-semibold text-sm">Buy-in: ${pool.buy_in_amount}</div>
-              <span className="text-xs px-2 py-1 rounded-sm bg-masters-gold/20 text-masters-gold font-medium">
+              <span className="text-xs px-2 py-1 rounded-sm bg-cheddar/20 text-cheddar font-medium">
                 Payment Pending
               </span>
             </div>
@@ -322,7 +331,7 @@ export default function PoolPage() {
                     href={`https://paypal.me/${pool.payment_details.replace(/^(https?:\/\/)?(paypal\.me\/)?/, '')}/${pool.buy_in_amount}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-augusta underline font-medium"
+                    className="text-pimento underline font-medium"
                   >
                     PayPal
                   </a>
@@ -372,16 +381,16 @@ export default function PoolPage() {
             {teams.map((team, i) => {
               const isMe = currentTeam?.id === team.id
               return (
-                <div key={team.id} className={`px-4 py-3 flex items-center justify-between ${isMe ? 'bg-augusta/5' : ''}`}>
+                <div key={team.id} className={`px-4 py-3 flex items-center justify-between ${isMe ? 'bg-pimento/5' : ''}`}>
                   <div className="flex items-center gap-3">
                     <span className="text-sm text-muted-gray w-6 font-serif">{team.draft_position || i + 1}</span>
-                    <span className={`font-medium ${isMe ? 'text-augusta' : ''}`}>
+                    <span className={`font-medium ${isMe ? 'text-pimento' : ''}`}>
                       {team.owner_name}
                       {isMe && (
-                        <span className="ml-2 text-xs text-augusta/60">(you)</span>
+                        <span className="ml-2 text-xs text-pimento/60">(you)</span>
                       )}
                       {team.is_commissioner && (
-                        <span className="ml-2 text-xs bg-augusta text-white px-2 py-0.5 rounded-sm">
+                        <span className="ml-2 text-xs bg-pimento text-white px-2 py-0.5 rounded-sm">
                           Commissioner
                         </span>
                       )}
@@ -401,7 +410,7 @@ export default function PoolPage() {
         {/* Waiting state */}
         <div className="text-center py-6">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-cream rounded-sm border border-muted-gray/20">
-            <span className="inline-block w-2 h-2 bg-masters-gold rounded-full animate-pulse" />
+            <span className="inline-block w-2 h-2 bg-cheddar rounded-full animate-pulse" />
             <span className="font-serif italic text-muted-gray text-sm">
               Waiting for the commissioner to start the draft...
             </span>

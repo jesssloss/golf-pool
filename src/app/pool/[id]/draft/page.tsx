@@ -7,6 +7,7 @@ import { getTeamForPick } from '@/lib/utils/snake-draft'
 import type { Pool, Team, DraftState, DraftPick, GolferScore } from '@/types'
 import MilestoneBanner from '@/components/MilestoneBanner'
 import { MILESTONE_COPY, EMPTY_STATE_COPY } from '@/lib/constants/copy'
+import GreenJacketIcon from '@/components/GreenJacketIcon'
 
 export default function DraftPage() {
   const params = useParams()
@@ -107,8 +108,9 @@ export default function DraftPage() {
 
   if (loading || !pool || !draftState) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <p className="loading-pulse font-serif italic text-muted-gray">{EMPTY_STATE_COPY.draftBoardEmpty}</p>
+      <main className="min-h-screen flex flex-col items-center justify-center">
+        <GreenJacketIcon size={32} />
+        <p className="loading-pulse font-serif italic text-muted-gray mt-3">{EMPTY_STATE_COPY.draftBoardEmpty}</p>
       </main>
     )
   }
@@ -186,8 +188,8 @@ export default function DraftPage() {
 
       {/* Pending pick confirmation bar */}
       {pendingPick && (isMyTurn || isCommissioner) && (
-        <div className="p-3 bg-masters-gold/20 border-b-2 border-masters-gold">
-          <div className="text-sm font-serif font-semibold text-augusta mb-2">
+        <div className="p-3 bg-cheddar/20 border-b-2 border-cheddar">
+          <div className="text-sm font-serif font-semibold text-pimento mb-2">
             {pendingPick.golfer_name}
           </div>
           <div className="flex gap-2">
@@ -197,7 +199,7 @@ export default function DraftPage() {
                 makePick(pendingPick.golfer_id, pendingPick.golfer_name)
                 setPendingPick(null)
               }}
-              className="flex-1 bg-augusta text-white py-2 px-4 rounded-sm text-sm font-semibold hover:bg-augusta-dark transition-colors disabled:opacity-50 min-h-[44px]"
+              className="flex-1 bg-pimento text-white py-2 px-4 rounded-sm text-sm font-semibold hover:bg-pimento-dark transition-colors disabled:opacity-50 min-h-[44px]"
             >
               {picking ? 'Confirming...' : 'Confirm Pick'}
             </button>
@@ -218,7 +220,7 @@ export default function DraftPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search golfers..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-augusta focus:border-transparent"
+          className="w-full px-3 py-2 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-pimento focus:border-transparent"
         />
       </div>
       <div className="max-h-96 overflow-y-auto">
@@ -231,13 +233,13 @@ export default function DraftPage() {
               onClick={() => setPendingPick({ golfer_id: g.golfer_id, golfer_name: g.golfer_name })}
               className={`w-full px-3 py-2 min-h-[44px] text-left text-sm flex items-center justify-between border-b border-muted-gray/10 transition-colors ${
                 isSelected
-                  ? 'bg-augusta/10 font-semibold'
+                  ? 'bg-pimento/10 font-semibold'
                   : 'hover:bg-cream disabled:opacity-50 disabled:hover:bg-white'
               }`}
             >
               <span className="flex items-center gap-2">
                 {isSelected && (
-                  <span className="text-augusta text-xs">&#10003;</span>
+                  <span className="text-pimento text-xs">&#10003;</span>
                 )}
                 {g.golfer_name}
               </span>
@@ -261,11 +263,11 @@ export default function DraftPage() {
     <div className="overflow-x-auto">
       <table className="w-full text-sm border-collapse">
         <thead>
-          <tr className="bg-augusta text-cream">
+          <tr className="bg-pimento text-cream">
             <th className="px-2 py-2 text-left font-serif text-xs">Rd</th>
             {teams.map(t => (
               <th key={t.id} className={`px-2 py-2 text-left font-serif text-xs ${
-                pickingTeam?.id === t.id ? 'text-masters-gold font-bold' : ''
+                pickingTeam?.id === t.id ? 'text-cheddar font-bold' : ''
               }`}>
                 {t.owner_name}
               </th>
@@ -297,7 +299,10 @@ export default function DraftPage() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-2xl font-serif font-bold text-augusta">Draft</h1>
+          <div className="flex items-center gap-2">
+            <GreenJacketIcon size={24} />
+            <h1 className="text-2xl font-serif font-bold text-pimento">Draft</h1>
+          </div>
           <div className="text-sm text-muted-gray">
             Pick {Math.min(draftState.current_pick, draftState.total_picks)} of {draftState.total_picks}
           </div>
@@ -310,7 +315,7 @@ export default function DraftPage() {
 
         {/* Current pick banner */}
         {!isComplete && pickingTeam && (
-          <div className={`rounded-sm p-4 mb-4 ${isMyTurn ? 'bg-augusta text-white' : 'bg-white border border-muted-gray/20'}`}>
+          <div className={`rounded-sm p-4 mb-4 ${isMyTurn ? 'bg-pimento text-white' : 'bg-white border border-muted-gray/20'}`}>
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm opacity-75">
@@ -323,7 +328,7 @@ export default function DraftPage() {
                 </div>
               </div>
               {timeLeft !== null && (
-                <div className={`text-3xl font-mono font-bold ${timeLeft <= 10 ? (isMyTurn ? 'text-masters-gold' : 'text-score-red') : ''}`}>
+                <div className={`text-3xl font-mono font-bold ${timeLeft <= 10 ? (isMyTurn ? 'text-cheddar' : 'text-score-red') : ''}`}>
                   {timeLeft === 0 ? '0:00' : `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`}
                 </div>
               )}
@@ -332,7 +337,7 @@ export default function DraftPage() {
               <div className="mt-2">
                 <button
                   onClick={autoPickBestAvailable}
-                  className="bg-masters-gold text-augusta-dark px-4 py-2 rounded-sm text-sm font-semibold min-h-[44px]"
+                  className="bg-cheddar text-pimento-dark px-4 py-2 rounded-sm text-sm font-semibold min-h-[44px]"
                 >
                   Auto-pick best available
                 </button>
@@ -342,7 +347,7 @@ export default function DraftPage() {
         )}
 
         {isComplete && (
-          <div className="bg-augusta text-white rounded-sm p-4 mb-4 text-center">
+          <div className="bg-pimento text-white rounded-sm p-4 mb-4 text-center">
             <MilestoneBanner text={MILESTONE_COPY.draftComplete} />
             <p className="text-sm opacity-75 mt-1">Redirecting to leaderboard...</p>
           </div>

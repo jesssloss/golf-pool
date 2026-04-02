@@ -10,9 +10,9 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        augusta: '#006747',
-        'augusta-dark': '#004D35',
-        'masters-gold': '#FEDD00',
+        pimento: '#006747',
+        'pimento-dark': '#004D35',
+        cheddar: '#FEDD00',
         cream: '#FFF8E7',
         'cream-dark': '#F5EDD6',
         'score-red': '#C41E3A',

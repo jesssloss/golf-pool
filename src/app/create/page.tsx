@@ -74,12 +74,12 @@ export default function CreatePool() {
     }
   }
 
-  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-augusta focus:border-transparent"
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-pimento focus:border-transparent"
 
   return (
     <main className="min-h-screen py-8 px-4">
       <div className="max-w-xl mx-auto">
-        <h1 className="text-3xl font-serif font-bold text-augusta mb-8">Create Your Pool</h1>
+        <h1 className="text-3xl font-serif font-bold text-pimento mb-8">Create Your Pool</h1>
 
         {error && (
           <div className="bg-red-50 text-score-red p-3 rounded-sm mb-4 text-sm">{error}</div>
@@ -169,7 +169,7 @@ export default function CreatePool() {
                     max={100}
                     value={rule.percentage}
                     onChange={e => updatePayoutPercentage(i, parseInt(e.target.value) || 0)}
-                    className="w-24 px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-augusta focus:border-transparent"
+                    className="w-24 px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-pimento focus:border-transparent"
                   />
                   <span className="text-sm text-muted-gray">%</span>
                   {payoutRules.length > 1 && (
@@ -188,7 +188,7 @@ export default function CreatePool() {
               <button
                 type="button"
                 onClick={addPayoutPosition}
-                className="text-sm text-augusta hover:text-augusta-dark font-medium min-h-[44px] px-2"
+                className="text-sm text-pimento hover:text-pimento-dark font-medium min-h-[44px] px-2"
               >
                 + Add Position
               </button>
@@ -203,7 +203,7 @@ export default function CreatePool() {
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="text-sm text-augusta hover:text-augusta-dark font-medium flex items-center gap-1 min-h-[44px]"
+              className="text-sm text-pimento hover:text-pimento-dark font-medium flex items-center gap-1 min-h-[44px]"
             >
               <span className={`inline-block transition-transform ${showAdvanced ? 'rotate-90' : ''}`}>&#9654;</span>
               Advanced Settings
@@ -274,7 +274,7 @@ export default function CreatePool() {
                     max={300}
                     value={formData.draftTimerSeconds}
                     onChange={e => setFormData({ ...formData, draftTimerSeconds: parseInt(e.target.value) })}
-                    className="w-full max-w-[200px] px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-augusta focus:border-transparent"
+                    className="w-full max-w-[200px] px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-pimento focus:border-transparent"
                   />
                   <p className="text-xs text-muted-gray mt-1">Time per pick before auto-draft kicks in</p>
                 </div>
@@ -285,7 +285,7 @@ export default function CreatePool() {
           <button
             type="submit"
             disabled={loading || totalPercentage !== 100}
-            className="w-full bg-augusta text-white py-3 px-6 rounded-sm font-semibold hover:bg-augusta-dark transition-colors disabled:opacity-50"
+            className="w-full bg-pimento text-white py-3 px-6 rounded-sm font-semibold hover:bg-pimento-dark transition-colors disabled:opacity-50"
           >
             {loading ? 'Creating...' : 'Create Pool'}
           </button>

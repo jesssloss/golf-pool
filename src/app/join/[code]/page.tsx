@@ -71,7 +71,7 @@ export default function JoinPool() {
         </div>
 
         {alreadyMember && (
-          <div className="bg-cream-dark text-augusta p-3 rounded-sm mb-4 text-sm font-serif italic">
+          <div className="bg-cream-dark text-pimento p-3 rounded-sm mb-4 text-sm font-serif italic">
             Welcome back, patron. Taking you to your pool...
           </div>
         )}
@@ -89,13 +89,13 @@ export default function JoinPool() {
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Enter your name"
-              className="w-full px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-augusta focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-pimento focus:border-transparent"
             />
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-augusta text-white py-3 px-6 rounded-sm font-semibold hover:bg-augusta-dark transition-colors disabled:opacity-50"
+            className="w-full bg-pimento text-white py-3 px-6 rounded-sm font-semibold hover:bg-pimento-dark transition-colors disabled:opacity-50"
           >
             {loading ? 'Joining...' : 'Join Pool'}
           </button>

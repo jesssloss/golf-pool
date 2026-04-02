@@ -215,8 +215,9 @@ export default function Leaderboard({ poolId, pool }: Props) {
 
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <p className="loading-pulse font-serif italic text-muted-gray">{EMPTY_STATE_COPY.waitingFirstRound}</p>
+      <main className="min-h-screen flex flex-col items-center justify-center">
+        <GreenJacketIcon size={32} />
+        <p className="loading-pulse font-serif italic text-muted-gray mt-3">{EMPTY_STATE_COPY.waitingFirstRound}</p>
       </main>
     )
   }
@@ -233,9 +234,12 @@ export default function Leaderboard({ poolId, pool }: Props) {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
-          <div>
-            <h1 className="text-2xl font-serif font-bold text-augusta">{pool.name}</h1>
-            <p className="text-sm text-muted-gray">{pool.tournament_name}</p>
+          <div className="flex items-center gap-2">
+            <GreenJacketIcon size={28} />
+            <div>
+              <h1 className="text-2xl font-serif font-bold text-pimento">{pool.name}</h1>
+              <p className="text-sm text-muted-gray">{pool.tournament_name}</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             {lastUpdated && (
@@ -245,14 +249,14 @@ export default function Leaderboard({ poolId, pool }: Props) {
             )}
             <button
               onClick={shareStandings}
-              className="text-sm px-3 py-2 min-h-[44px] border border-augusta text-augusta rounded-sm hover:bg-augusta hover:text-white transition-colors"
+              className="text-sm px-3 py-2 min-h-[44px] border border-pimento text-pimento rounded-sm hover:bg-pimento hover:text-white transition-colors"
             >
               {copied ? 'Copied!' : 'Share'}
             </button>
             <button
               onClick={handleManualRefresh}
               disabled={refreshing}
-              className="text-sm px-3 py-2 min-h-[44px] border border-augusta text-augusta rounded-sm hover:bg-augusta hover:text-white transition-colors disabled:opacity-50"
+              className="text-sm px-3 py-2 min-h-[44px] border border-pimento text-pimento rounded-sm hover:bg-pimento hover:text-white transition-colors disabled:opacity-50"
             >
               {refreshing ? '...' : 'Refresh'}
             </button>
@@ -267,7 +271,7 @@ export default function Leaderboard({ poolId, pool }: Props) {
         {/* Your Position Card */}
         {myStanding && (
           <Link href={`/pool/${poolId}/team/${myStanding.team.id}`}>
-            <div className="bg-white rounded-sm p-4 mb-4 border border-augusta/30 flex items-center justify-between hover:bg-cream transition-colors">
+            <div className="bg-white rounded-sm p-4 mb-4 border border-pimento/30 flex items-center justify-between hover:bg-cream transition-colors">
               <div>
                 <div className="text-xs text-muted-gray">Your Team</div>
                 <div className="font-serif font-semibold text-lg">{myStanding.team.owner_name}</div>
@@ -281,7 +285,7 @@ export default function Leaderboard({ poolId, pool }: Props) {
                 )}
                 <div className="text-right">
                   <div className="text-xs text-muted-gray">Position</div>
-                  <div className="text-2xl font-serif font-bold text-augusta">#{myStanding.rank}</div>
+                  <div className="text-2xl font-serif font-bold text-pimento">#{myStanding.rank}</div>
                 </div>
                 <div className={`text-xl font-mono font-bold ${scoreColor(myStanding.teamTotal)}`}>
                   {formatScore(myStanding.teamTotal)}
@@ -291,7 +295,7 @@ export default function Leaderboard({ poolId, pool }: Props) {
           </Link>
         )}
 
-        {/* Green Jacket Card overlay */}
+        {/* Champion Card overlay */}
         {showJacketCard && winner && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowJacketCard(false)}>
             <div onClick={e => e.stopPropagation()}>
@@ -316,8 +320,8 @@ export default function Leaderboard({ poolId, pool }: Props) {
             return (
               <Link key={s.team.id} href={`/pool/${poolId}/team/${s.team.id}`}>
                 <div className={`rounded-sm p-3 border ${
-                  isWinner ? 'bg-masters-gold/10 border-masters-gold/40' :
-                  isMe ? 'bg-augusta/5 border-augusta/30' :
+                  isWinner ? 'bg-cheddar/10 border-cheddar/40' :
+                  isMe ? 'bg-pimento/5 border-pimento/30' :
                   'bg-white border-muted-gray/20'
                 }`}>
                   <div className="flex items-center justify-between">
@@ -328,7 +332,7 @@ export default function Leaderboard({ poolId, pool }: Props) {
                       <span className="font-serif font-semibold">
                         {isWinner && <GreenJacketIcon size={16} />}
                         {' '}{s.team.owner_name}
-                        {isMe && <span className="ml-1 text-xs text-augusta/60">(you)</span>}
+                        {isMe && <span className="ml-1 text-xs text-pimento/60">(you)</span>}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
@@ -360,7 +364,7 @@ export default function Leaderboard({ poolId, pool }: Props) {
         <div className="mt-4 overflow-x-auto hidden sm:block">
           <table className="w-full text-sm border-collapse">
             <thead>
-              <tr className="bg-augusta text-cream">
+              <tr className="bg-pimento text-cream">
                 <th className="px-3 py-2 text-left font-serif font-bold w-10">#</th>
                 <th className="px-3 py-2 text-left font-serif font-bold">Team</th>
                 <th className="px-3 py-2 text-center font-serif font-bold w-16">R1</th>
@@ -392,8 +396,8 @@ export default function Leaderboard({ poolId, pool }: Props) {
                   <tr
                     key={s.team.id}
                     className={`border-b border-muted-gray/20 ${
-                      isWinner ? 'bg-masters-gold/10' :
-                      isMe ? 'bg-augusta/5' :
+                      isWinner ? 'bg-cheddar/10' :
+                      isMe ? 'bg-pimento/5' :
                       idx % 2 === 0 ? 'bg-white' : 'bg-cream'
                     }`}
                   >
@@ -409,7 +413,7 @@ export default function Leaderboard({ poolId, pool }: Props) {
                         <span className="font-serif font-semibold">
                           {isWinner && <GreenJacketIcon size={16} />}
                           {' '}{s.team.owner_name}
-                          {isMe && <span className="ml-1 text-xs text-augusta/60">(you)</span>}
+                          {isMe && <span className="ml-1 text-xs text-pimento/60">(you)</span>}
                         </span>
                       </Link>
                       {payout && (
@@ -482,7 +486,7 @@ export default function Leaderboard({ poolId, pool }: Props) {
               <div className="px-4 py-3 border-b border-muted-gray/20 bg-cream flex items-center justify-between">
                 <h2 className="font-serif font-semibold text-gray-700">Payout Summary</h2>
                 <div className="text-xs text-muted-gray">
-                  Prize Pool: <span className="font-semibold text-augusta">${prizePool}</span>
+                  Prize Pool: <span className="font-semibold text-pimento">${prizePool}</span>
                 </div>
               </div>
               <div className="divide-y divide-muted-gray/20">
@@ -500,7 +504,7 @@ export default function Leaderboard({ poolId, pool }: Props) {
                         className={`text-xs px-3 py-2 min-h-[44px] rounded-sm ${
                           isSent
                             ? 'bg-score-green/10 text-score-green cursor-default'
-                            : 'bg-gray-100 text-muted-gray hover:bg-masters-gold/20 hover:text-masters-gold transition-colors'
+                            : 'bg-gray-100 text-muted-gray hover:bg-cheddar/20 hover:text-cheddar transition-colors'
                         }`}
                       >
                         {isSent ? 'Sent' : 'Mark Sent'}
@@ -524,7 +528,7 @@ export default function Leaderboard({ poolId, pool }: Props) {
           <div className="mt-6 text-center">
             <button
               onClick={() => setShowJacketCard(true)}
-              className="px-6 py-3 min-h-[44px] bg-augusta text-white font-serif rounded-sm hover:bg-augusta-dark transition-colors"
+              className="px-6 py-3 min-h-[44px] bg-pimento text-white font-serif rounded-sm hover:bg-pimento-dark transition-colors"
             >
               View Champion
             </button>

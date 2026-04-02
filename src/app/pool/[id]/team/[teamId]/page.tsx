@@ -10,6 +10,7 @@ import FlipScore from '@/components/FlipScore'
 import TeamCard from '@/components/TeamCard'
 import MilestoneBanner from '@/components/MilestoneBanner'
 import { MILESTONE_COPY } from '@/lib/constants/copy'
+import GreenJacketIcon from '@/components/GreenJacketIcon'
 
 export default function TeamDetail() {
   const params = useParams()
@@ -66,8 +67,9 @@ export default function TeamDetail() {
 
   if (!pool || !team) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <p className="loading-pulse font-serif italic text-muted-gray">Loading...</p>
+      <main className="min-h-screen flex flex-col items-center justify-center">
+        <GreenJacketIcon size={32} />
+        <p className="loading-pulse font-serif italic text-muted-gray mt-3">Loading...</p>
       </main>
     )
   }
@@ -93,11 +95,14 @@ export default function TeamDetail() {
   return (
     <main className="min-h-screen py-4 px-4">
       <div className="max-w-3xl mx-auto">
-        <Link href={`/pool/${poolId}`} className="text-sm text-augusta hover:underline mb-4 block min-h-[44px] flex items-center">
+        <Link href={`/pool/${poolId}`} className="text-sm text-pimento hover:underline mb-4 block min-h-[44px] flex items-center">
           Back to Leaderboard
         </Link>
 
-        <h1 className="text-2xl font-serif font-bold text-augusta mb-1">{team.owner_name}</h1>
+        <div className="flex items-center gap-2 mb-1">
+          <GreenJacketIcon size={24} />
+          <h1 className="text-2xl font-serif font-bold text-pimento">{team.owner_name}</h1>
+        </div>
         <p className="text-sm text-muted-gray mb-2">
           Best {pool.scoring_players} of {pool.players_per_team} golfers count
         </p>
@@ -111,7 +116,7 @@ export default function TeamDetail() {
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
-              <tr className="bg-augusta text-cream">
+              <tr className="bg-pimento text-cream">
                 <th className="px-4 py-2 text-left font-serif font-bold">Golfer</th>
                 <th className="px-2 py-2 text-center font-serif font-bold w-14">R1</th>
                 <th className="px-2 py-2 text-center font-serif font-bold w-14">R2</th>
@@ -212,7 +217,7 @@ export default function TeamDetail() {
         <div className="mt-6 text-center">
           <button
             onClick={() => setShowTeamCard(!showTeamCard)}
-            className="text-sm text-augusta hover:underline min-h-[44px] px-4"
+            className="text-sm text-pimento hover:underline min-h-[44px] px-4"
           >
             {showTeamCard ? 'Hide Team Card' : 'View Team Card'}
           </button>
