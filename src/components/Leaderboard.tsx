@@ -132,6 +132,7 @@ export default function Leaderboard({ poolId, pool }: Props) {
     setPayoutStatuses(prev => ({ ...prev, [teamId]: 'sent' }))
   }
 
+
   // Load current team
   useEffect(() => {
     async function loadMe() {

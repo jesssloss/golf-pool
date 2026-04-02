@@ -85,6 +85,10 @@ export default function CreatePool() {
           <div className="bg-red-50 text-score-red p-3 rounded-sm mb-4 text-sm">{error}</div>
         )}
 
+        {error && (
+          <div className="bg-red-50 text-score-red p-3 rounded-sm mb-4 text-sm">{error}</div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Pool Name</label>
