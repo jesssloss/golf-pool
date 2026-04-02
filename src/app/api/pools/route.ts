@@ -24,6 +24,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Pool name and commissioner name are required' }, { status: 400 })
   }
 
+  // Input validation: bounds checking
+  if (playersPerTeam < 2 || playersPerTeam > 10) {
+    return NextResponse.json({ error: 'Players per team must be between 2 and 10' }, { status: 400 })
+  }
+  if (scoringPlayers < 1 || scoringPlayers > playersPerTeam) {
+    return NextResponse.json({ error: 'Scoring players must be between 1 and players per team' }, { status: 400 })
+  }
+  if (missedCutScore < 1 || missedCutScore > 200) {
+    return NextResponse.json({ error: 'Missed cut score must be between 1 and 200' }, { status: 400 })
+  }
+  if (draftTimerSeconds < 0 || draftTimerSeconds > 600) {
+    return NextResponse.json({ error: 'Draft timer must be between 0 and 600 seconds' }, { status: 400 })
+  }
+  if (buyInAmount < 0 || buyInAmount > 10000) {
+    return NextResponse.json({ error: 'Buy-in amount must be between 0 and 10000' }, { status: 400 })
+  }
+
   const supabase = createServerSupabaseClient()
   const sessionToken = crypto.randomUUID()
   const inviteCode = generateInviteCode()

@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { MASTERS_FIELD } from '@/lib/data/masters-field'
+import { cookies } from 'next/headers'
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerSupabaseClient()
+
+  // Verify commissioner
+  const cookieStore = cookies()
+  const sessionToken = cookieStore.get(`session_token_${params.id}`)?.value
+  const { data: pool } = await supabase.from('pools').select('commissioner_token').eq('id', params.id).single()
+  if (!pool || pool.commissioner_token !== sessionToken) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  }
 
   try {
     // Use the curated Masters field as the primary source.

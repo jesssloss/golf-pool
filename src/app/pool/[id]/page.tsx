@@ -19,23 +19,25 @@ export default function PoolPage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [payoutRules, setPayoutRules] = useState<PayoutRule[]>([])
   const [currentTeam, setCurrentTeam] = useState<Team | null>(null)
+  const [isCommissioner, setIsCommissioner] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const loadData = useCallback(async () => {
     const [poolRes, teamsRes, rulesRes] = await Promise.all([
-      supabase.from('pools').select('*').eq('id', poolId).single(),
-      supabase.from('teams').select('*').eq('pool_id', poolId).order('draft_position'),
+      supabase.from('pools').select('id, name, tournament_name, invite_code, status, players_per_team, scoring_players, missed_cut_score, drop_deadline_round, draft_timer_seconds, draft_mode, buy_in_amount, payment_method, payment_details, created_at').eq('id', poolId).single(),
+      supabase.from('teams').select('id, pool_id, owner_name, draft_position, is_commissioner, buy_in_paid, created_at').eq('pool_id', poolId).order('draft_position'),
       supabase.from('payout_rules').select('*').eq('pool_id', poolId).order('position'),
     ])
 
-    if (poolRes.data) setPool(poolRes.data)
-    if (teamsRes.data) setTeams(teamsRes.data)
+    if (poolRes.data) setPool(poolRes.data as Pool)
+    if (teamsRes.data) setTeams(teamsRes.data as Team[])
     if (rulesRes.data) setPayoutRules(rulesRes.data)
 
     const res = await fetch(`/api/pools/${poolId}/me`)
     if (res.ok) {
       const data = await res.json()
       if (data.team) setCurrentTeam(data.team)
+      setIsCommissioner(data.isCommissioner ?? false)
     }
 
     setLoading(false)
@@ -81,8 +83,6 @@ export default function PoolPage() {
       </main>
     )
   }
-
-  const isCommissioner = currentTeam?.is_commissioner
 
   if (pool.status === 'active' || pool.status === 'complete') {
     return <Leaderboard poolId={poolId} pool={pool} />

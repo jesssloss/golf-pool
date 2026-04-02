@@ -22,6 +22,7 @@ export default function DraftPage() {
   const [picks, setPicks] = useState<DraftPick[]>([])
   const [golfers, setGolfers] = useState<GolferScore[]>([])
   const [currentTeam, setCurrentTeam] = useState<Team | null>(null)
+  const [isCommissioner, setIsCommissioner] = useState(false)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [picking, setPicking] = useState(false)
@@ -35,15 +36,15 @@ export default function DraftPage() {
 
   const loadData = useCallback(async () => {
     const [poolRes, teamsRes, draftRes, picksRes, golfersRes] = await Promise.all([
-      supabase.from('pools').select('*').eq('id', poolId).single(),
-      supabase.from('teams').select('*').eq('pool_id', poolId).order('draft_position'),
+      supabase.from('pools').select('id, name, tournament_name, invite_code, status, players_per_team, scoring_players, missed_cut_score, drop_deadline_round, draft_timer_seconds, draft_mode, buy_in_amount, payment_method, payment_details, created_at').eq('id', poolId).single(),
+      supabase.from('teams').select('id, pool_id, owner_name, draft_position, is_commissioner, buy_in_paid, created_at').eq('pool_id', poolId).order('draft_position'),
       supabase.from('draft_state').select('*').eq('pool_id', poolId).single(),
       supabase.from('draft_picks').select('*').eq('pool_id', poolId).order('pick_number'),
       supabase.from('golfer_scores').select('*').eq('pool_id', poolId).is('round_number', null),
     ])
 
-    if (poolRes.data) setPool(poolRes.data)
-    if (teamsRes.data) setTeams(teamsRes.data)
+    if (poolRes.data) setPool(poolRes.data as Pool)
+    if (teamsRes.data) setTeams(teamsRes.data as Team[])
     if (draftRes.data) setDraftState(draftRes.data)
     if (picksRes.data) setPicks(picksRes.data)
     if (golfersRes.data) setGolfers(golfersRes.data)
@@ -52,6 +53,7 @@ export default function DraftPage() {
     if (meRes.ok) {
       const data = await meRes.json()
       if (data.team) setCurrentTeam(data.team)
+      setIsCommissioner(data.isCommissioner ?? false)
     }
 
     setLoading(false)
@@ -123,7 +125,6 @@ export default function DraftPage() {
   const currentPickInfo = !isComplete ? getTeamForPick(teamIds, draftState.current_pick) : null
   const pickingTeam = currentPickInfo ? teams.find(t => t.id === currentPickInfo.team_id) : null
   const isMyTurn = currentTeam && pickingTeam && currentTeam.id === pickingTeam.id
-  const isCommissioner = currentTeam && pool.commissioner_token === currentTeam.session_token
   const isManualMode = pool.draft_mode === 'manual'
   const isUnlimitedTimer = pool.draft_timer_seconds === 0
 

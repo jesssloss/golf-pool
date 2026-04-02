@@ -22,5 +22,18 @@ export async function GET(
     .eq('session_token', sessionToken)
     .single()
 
-  return NextResponse.json({ team: team || null })
+  if (!team) {
+    return NextResponse.json({ team: null, isCommissioner: false })
+  }
+
+  // Check commissioner status server-side by comparing tokens
+  const { data: pool } = await supabase
+    .from('pools')
+    .select('commissioner_token')
+    .eq('id', params.id)
+    .single()
+
+  const isCommissioner = !!(pool && pool.commissioner_token === sessionToken)
+
+  return NextResponse.json({ team, isCommissioner })
 }

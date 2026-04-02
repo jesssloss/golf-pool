@@ -28,14 +28,14 @@ export default function TeamDetail() {
 
   const loadData = useCallback(async () => {
     const [poolRes, teamRes, tgRes, scoresRes] = await Promise.all([
-      supabase.from('pools').select('*').eq('id', poolId).single(),
-      supabase.from('teams').select('*').eq('id', teamId).single(),
+      supabase.from('pools').select('id, name, tournament_name, invite_code, status, players_per_team, scoring_players, missed_cut_score, drop_deadline_round, draft_timer_seconds, draft_mode, buy_in_amount, payment_method, payment_details, created_at').eq('id', poolId).single(),
+      supabase.from('teams').select('id, pool_id, owner_name, draft_position, is_commissioner, buy_in_paid, created_at').eq('id', teamId).single(),
       supabase.from('team_golfers').select('*').eq('pool_id', poolId).eq('team_id', teamId),
       supabase.from('golfer_scores').select('*').eq('pool_id', poolId),
     ])
 
-    if (poolRes.data) setPool(poolRes.data)
-    if (teamRes.data) setTeam(teamRes.data)
+    if (poolRes.data) setPool(poolRes.data as Pool)
+    if (teamRes.data) setTeam(teamRes.data as Team)
 
     if (tgRes.data && scoresRes.data) {
       setGolfers(tgRes.data.map(tg => ({

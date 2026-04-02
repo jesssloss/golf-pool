@@ -43,13 +43,13 @@ export default function Leaderboard({ poolId, pool }: Props) {
 
   const loadStandings = useCallback(async () => {
     const [teamsRes, tgRes, scoresRes, rulesRes] = await Promise.all([
-      supabase.from('teams').select('*').eq('pool_id', poolId),
+      supabase.from('teams').select('id, pool_id, owner_name, draft_position, is_commissioner, buy_in_paid, created_at').eq('pool_id', poolId),
       supabase.from('team_golfers').select('*').eq('pool_id', poolId),
       supabase.from('golfer_scores').select('*').eq('pool_id', poolId),
       supabase.from('payout_rules').select('*').eq('pool_id', poolId).order('position'),
     ])
 
-    const teams = teamsRes.data || []
+    const teams = (teamsRes.data || []) as Team[]
     const teamGolfers = tgRes.data || []
     const allScores = scoresRes.data || []
     if (rulesRes.data) setPayoutRules(rulesRes.data)

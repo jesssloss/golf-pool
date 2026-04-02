@@ -45,6 +45,17 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   const poolId = params.id
   const supabase = createServerSupabaseClient()
 
+  // Verify the caller is a pool member
+  const cookieStore = cookies()
+  const sessionToken = cookieStore.get(`session_token_${poolId}`)?.value
+  if (!sessionToken) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  }
+  const { data: team } = await supabase.from('teams').select('id').eq('pool_id', poolId).eq('session_token', sessionToken).single()
+  if (!team) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  }
+
   const { data: payments } = await supabase
     .from('payments')
     .select('*')
