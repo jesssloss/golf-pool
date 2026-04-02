@@ -23,9 +23,12 @@ export default function DraftPage() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [picking, setPicking] = useState(false)
+  const [pickError, setPickError] = useState('')
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [autoPickTriggered, setAutoPickTriggered] = useState(false)
   const [pendingPick, setPendingPick] = useState<{ golfer_id: string; golfer_name: string } | null>(null)
+
+  const pickerRef = useRef<HTMLDivElement>(null)
 
   const loadData = useCallback(async () => {
     const [poolRes, teamsRes, draftRes, picksRes, golfersRes] = await Promise.all([
@@ -61,7 +64,6 @@ export default function DraftPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pools', filter: `id=eq.${poolId}` }, () => loadData())
       .subscribe()
 
-    // Polling fallback in case Realtime isn't connected
     const pollInterval = setInterval(loadData, 3000)
 
     return () => {
@@ -99,13 +101,14 @@ export default function DraftPage() {
       prevPickRef.current = draftState?.current_pick
       setAutoPickTriggered(false)
       setPendingPick(null)
+      setPickError('')
     }
   }, [draftState?.current_pick])
 
   if (loading || !pool || !draftState) {
     return (
       <main className="min-h-screen flex items-center justify-center">
-        <p className="font-serif italic text-muted-gray">{EMPTY_STATE_COPY.draftBoardEmpty}</p>
+        <p className="loading-pulse font-serif italic text-muted-gray">{EMPTY_STATE_COPY.draftBoardEmpty}</p>
       </main>
     )
   }
@@ -125,6 +128,7 @@ export default function DraftPage() {
 
   async function makePick(golferId: string, golferName: string) {
     setPicking(true)
+    setPickError('')
     try {
       const res = await fetch(`/api/pools/${poolId}/draft/pick`, {
         method: 'POST',
@@ -133,12 +137,12 @@ export default function DraftPage() {
       })
       if (!res.ok) {
         const data = await res.json()
-        alert(data.error)
+        setPickError(data.error || 'Failed to make pick')
       }
       setSearch('')
       await loadData()
     } catch {
-      alert('Failed to make pick')
+      setPickError('Failed to make pick. Check your connection.')
     }
     setPicking(false)
   }
@@ -146,7 +150,6 @@ export default function DraftPage() {
   async function autoPickBestAvailable() {
     if (autoPickTriggered || picking) return
     setAutoPickTriggered(true)
-    // Pick the highest-ranked available golfer (already sorted by world_ranking)
     const pickedIds = new Set(picks.map(p => p.golfer_id))
     const best = golfers
       .filter(g => !pickedIds.has(g.golfer_id))
@@ -155,6 +158,9 @@ export default function DraftPage() {
       await makePick(best.golfer_id, best.golfer_name)
     }
   }
+
+  // Auto-scroll to picker on mobile when it's your turn
+  const shouldShowPickerFirst = isMyTurn || (isCommissioner && timeLeft === 0)
 
   const rounds = pool.players_per_team
   const draftBoard: (DraftPick | null)[][] = []
@@ -167,6 +173,124 @@ export default function DraftPage() {
     }
     draftBoard.push(row)
   }
+
+  // Golfer picker component (shared between mobile and desktop)
+  const golferPicker = (
+    <div ref={pickerRef} className="bg-white rounded-sm border border-muted-gray/20">
+      {/* Pick error */}
+      {pickError && (
+        <div className="p-3 bg-red-50 text-score-red text-sm border-b border-red-100">
+          {pickError}
+        </div>
+      )}
+
+      {/* Pending pick confirmation bar */}
+      {pendingPick && (isMyTurn || isCommissioner) && (
+        <div className="p-3 bg-masters-gold/20 border-b-2 border-masters-gold">
+          <div className="text-sm font-serif font-semibold text-augusta mb-2">
+            {pendingPick.golfer_name}
+          </div>
+          <div className="flex gap-2">
+            <button
+              disabled={picking}
+              onClick={() => {
+                makePick(pendingPick.golfer_id, pendingPick.golfer_name)
+                setPendingPick(null)
+              }}
+              className="flex-1 bg-augusta text-white py-2 px-4 rounded-sm text-sm font-semibold hover:bg-augusta-dark transition-colors disabled:opacity-50 min-h-[44px]"
+            >
+              {picking ? 'Confirming...' : 'Confirm Pick'}
+            </button>
+            <button
+              disabled={picking}
+              onClick={() => setPendingPick(null)}
+              className="px-4 py-2 border border-muted-gray/30 text-muted-gray rounded-sm text-sm hover:bg-cream transition-colors min-h-[44px]"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="p-3 border-b border-muted-gray/20">
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search golfers..."
+          className="w-full px-3 py-2 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-augusta focus:border-transparent"
+        />
+      </div>
+      <div className="max-h-96 overflow-y-auto">
+        {availableGolfers.map(g => {
+          const isSelected = pendingPick?.golfer_id === g.golfer_id
+          return (
+            <button
+              key={g.golfer_id}
+              disabled={(!isMyTurn && !isCommissioner) || picking}
+              onClick={() => setPendingPick({ golfer_id: g.golfer_id, golfer_name: g.golfer_name })}
+              className={`w-full px-3 py-2 min-h-[44px] text-left text-sm flex items-center justify-between border-b border-muted-gray/10 transition-colors ${
+                isSelected
+                  ? 'bg-augusta/10 font-semibold'
+                  : 'hover:bg-cream disabled:opacity-50 disabled:hover:bg-white'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                {isSelected && (
+                  <span className="text-augusta text-xs">&#10003;</span>
+                )}
+                {g.golfer_name}
+              </span>
+              {g.world_ranking && (
+                <span className="text-xs text-muted-gray">#{g.world_ranking}</span>
+              )}
+            </button>
+          )
+        })}
+        {availableGolfers.length === 0 && (
+          <div className="p-4 text-center text-muted-gray text-sm font-serif italic">
+            {golfers.length === 0 ? EMPTY_STATE_COPY.draftBoardEmpty : 'No golfers match your search'}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
+  // Draft board component (shared between mobile and desktop)
+  const draftBoardTable = (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr className="bg-augusta text-cream">
+            <th className="px-2 py-2 text-left font-serif text-xs">Rd</th>
+            {teams.map(t => (
+              <th key={t.id} className={`px-2 py-2 text-left font-serif text-xs ${
+                pickingTeam?.id === t.id ? 'text-masters-gold font-bold' : ''
+              }`}>
+                {t.owner_name}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {draftBoard.map((row, r) => (
+            <tr key={r} className={`border-b border-muted-gray/20 ${r % 2 === 0 ? 'bg-white' : 'bg-cream'}`}>
+              <td className="px-2 py-2 text-muted-gray font-serif">{r + 1}</td>
+              {row.map((pick, t) => (
+                <td key={t} className="px-2 py-2">
+                  {pick ? (
+                    <span className="text-xs font-medium">{pick.golfer_name}</span>
+                  ) : (
+                    <span className="text-muted-gray/40">-</span>
+                  )}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
 
   return (
     <main className="min-h-screen py-4 px-4">
@@ -199,7 +323,7 @@ export default function DraftPage() {
                 </div>
               </div>
               {timeLeft !== null && (
-                <div className={`text-3xl font-mono font-bold ${timeLeft <= 10 ? 'text-score-red' : ''}`}>
+                <div className={`text-3xl font-mono font-bold ${timeLeft <= 10 ? (isMyTurn ? 'text-masters-gold' : 'text-score-red') : ''}`}>
                   {timeLeft === 0 ? '0:00' : `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`}
                 </div>
               )}
@@ -208,7 +332,7 @@ export default function DraftPage() {
               <div className="mt-2">
                 <button
                   onClick={autoPickBestAvailable}
-                  className="bg-masters-gold text-augusta-dark px-4 py-1 rounded-sm text-sm font-semibold"
+                  className="bg-masters-gold text-augusta-dark px-4 py-2 rounded-sm text-sm font-semibold min-h-[44px]"
                 >
                   Auto-pick best available
                 </button>
@@ -224,108 +348,27 @@ export default function DraftPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Draft board */}
-          <div className="lg:col-span-2 overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-augusta text-cream">
-                  <th className="px-2 py-2 text-left font-serif text-xs">Rd</th>
-                  {teams.map(t => (
-                    <th key={t.id} className={`px-2 py-2 text-left font-serif text-xs ${
-                      pickingTeam?.id === t.id ? 'text-masters-gold font-bold' : ''
-                    }`}>
-                      {t.owner_name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {draftBoard.map((row, r) => (
-                  <tr key={r} className={`border-b border-muted-gray/20 ${r % 2 === 0 ? 'bg-white' : 'bg-cream'}`}>
-                    <td className="px-2 py-2 text-muted-gray font-serif">{r + 1}</td>
-                    {row.map((pick, t) => (
-                      <td key={t} className="px-2 py-2">
-                        {pick ? (
-                          <span className="text-xs font-medium">{pick.golfer_name}</span>
-                        ) : (
-                          <span className="text-muted-gray/40">-</span>
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {/* Mobile Layout: picker first when it's your turn, board first when watching */}
+        <div className="sm:hidden space-y-4">
+          {shouldShowPickerFirst ? (
+            <>
+              {golferPicker}
+              {draftBoardTable}
+            </>
+          ) : (
+            <>
+              {draftBoardTable}
+              {golferPicker}
+            </>
+          )}
+        </div>
 
-          {/* Golfer picker */}
-          <div className="bg-white rounded-sm border border-muted-gray/20">
-            {/* Pending pick confirmation bar */}
-            {pendingPick && (isMyTurn || isCommissioner) && (
-              <div className="p-3 bg-masters-gold/20 border-b-2 border-masters-gold">
-                <div className="text-sm font-serif font-semibold text-augusta mb-2">
-                  {pendingPick.golfer_name}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    disabled={picking}
-                    onClick={() => {
-                      makePick(pendingPick.golfer_id, pendingPick.golfer_name)
-                      setPendingPick(null)
-                    }}
-                    className="flex-1 bg-augusta text-white py-2 px-4 rounded-sm text-sm font-semibold hover:bg-augusta-dark transition-colors disabled:opacity-50"
-                  >
-                    {picking ? 'Confirming...' : 'Confirm Pick'}
-                  </button>
-                  <button
-                    disabled={picking}
-                    onClick={() => setPendingPick(null)}
-                    className="px-4 py-2 border border-muted-gray/30 text-muted-gray rounded-sm text-sm hover:bg-cream transition-colors"
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="p-3 border-b border-muted-gray/20">
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search golfers..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-augusta focus:border-transparent"
-              />
-            </div>
-            <div className="max-h-96 overflow-y-auto">
-              {availableGolfers.map(g => {
-                const isSelected = pendingPick?.golfer_id === g.golfer_id
-                return (
-                  <button
-                    key={g.golfer_id}
-                    disabled={(!isMyTurn && !isCommissioner) || picking}
-                    onClick={() => setPendingPick({ golfer_id: g.golfer_id, golfer_name: g.golfer_name })}
-                    className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between border-b border-muted-gray/10 transition-colors ${
-                      isSelected
-                        ? 'bg-augusta/10 border-l-2 border-l-augusta font-semibold'
-                        : 'hover:bg-cream disabled:opacity-50 disabled:hover:bg-white'
-                    }`}
-                  >
-                    <span>{g.golfer_name}</span>
-                    {g.world_ranking && (
-                      <span className="text-xs text-muted-gray">#{g.world_ranking}</span>
-                    )}
-                  </button>
-                )
-              })}
-              {availableGolfers.length === 0 && (
-                <div className="p-4 text-center text-muted-gray text-sm font-serif italic">
-                  {golfers.length === 0 ? EMPTY_STATE_COPY.draftBoardEmpty : 'No golfers match your search'}
-                </div>
-              )}
-            </div>
+        {/* Desktop Layout: side by side */}
+        <div className="hidden sm:grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2">
+            {draftBoardTable}
           </div>
+          {golferPicker}
         </div>
       </div>
     </main>

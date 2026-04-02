@@ -55,3 +55,13 @@ body {
 .milestone-fade {
   animation: fadeIn 600ms ease-out forwards;
 }
+
+/* Loading pulse for Masters copy */
+@keyframes loadingPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.loading-pulse {
+  animation: loadingPulse 2s ease-in-out infinite;
+}

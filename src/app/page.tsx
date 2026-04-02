@@ -1,17 +1,23 @@
 import Link from 'next/link'
+import GreenJacketIcon from '@/components/GreenJacketIcon'
 
 export default function Home() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-4">
-      <div className="max-w-2xl w-full text-center">
-        <div className="mb-8">
+      <div className="max-w-md w-full text-center">
+        <div className="mb-10">
+          <div className="flex justify-center mb-6">
+            <GreenJacketIcon size={48} />
+          </div>
           <h1 className="text-5xl md:text-6xl font-serif font-bold text-augusta mb-4 tracking-tight">
             Masters Pool
           </h1>
-          <p className="text-xl text-muted-gray">
+          <p className="text-lg text-muted-gray">
             Draft your squad. Track live scores. Win the green jacket.
           </p>
         </div>
+
+        <div className="w-24 mx-auto border-t border-augusta/30 mb-10" />
 
         <div className="space-y-4">
           <Link
@@ -23,21 +29,6 @@ export default function Home() {
           <p className="text-sm text-muted-gray">
             Already have an invite? Ask your commissioner for the join link.
           </p>
-        </div>
-
-        <div className="mt-16 grid grid-cols-3 gap-8 text-center">
-          <div>
-            <div className="text-3xl font-serif font-bold text-augusta">Draft</div>
-            <p className="text-sm text-muted-gray mt-1">Live snake draft with your friends</p>
-          </div>
-          <div>
-            <div className="text-3xl font-serif font-bold text-augusta">Track</div>
-            <p className="text-sm text-muted-gray mt-1">Real-time scores from Augusta</p>
-          </div>
-          <div>
-            <div className="text-3xl font-serif font-bold text-augusta">Win</div>
-            <p className="text-sm text-muted-gray mt-1">Lowest score takes the pot</p>
-          </div>
         </div>
       </div>
     </main>
