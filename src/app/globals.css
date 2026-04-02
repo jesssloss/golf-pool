@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  color: #1a1a1a;
+  background: #FFF8E7;
+}
+
+/* FlipScore animation */
+.flip-card {
+  perspective: 300px;
+}
+
+.flip-card-inner {
+  position: relative;
+  transform-style: preserve-3d;
+}
+
+.flip-card-front,
+.flip-card-back {
+  backface-visibility: hidden;
+}
+
+.flip-card-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateX(180deg);
+}
+
+@keyframes flipDown {
+  0% { transform: rotateX(0deg); }
+  100% { transform: rotateX(-180deg); }
+}
+
+@keyframes flipUp {
+  0% { transform: rotateX(180deg); }
+  100% { transform: rotateX(0deg); }
+}
+
+.flipping .flip-card-front {
+  animation: flipDown 450ms ease-in-out forwards;
+}
+
+.flipping .flip-card-back {
+  animation: flipUp 450ms ease-in-out forwards;
+}
+
+/* Milestone fade-in */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.milestone-fade {
+  animation: fadeIn 600ms ease-out forwards;
+}
