@@ -10,6 +10,9 @@ import StatusBadge from './StatusBadge'
 import GreenJacketIcon from './GreenJacketIcon'
 import MilestoneBanner from './MilestoneBanner'
 import GreenJacketCard from './GreenJacketCard'
+import VictoryCard from './VictoryCard'
+import { calculatePayouts } from '@/lib/utils/ties'
+import type { Payment } from '@/types'
 
 interface Props {
   poolId: string
@@ -34,6 +37,7 @@ export default function Leaderboard({ poolId, pool }: Props) {
   const [prevRanks, setPrevRanks] = useState<Record<string, number>>({})
   const [payoutRules, setPayoutRules] = useState<PayoutRule[]>([])
   const [copied, setCopied] = useState(false)
+  const [payoutStatuses, setPayoutStatuses] = useState<Record<string, string>>({})
   const isFirstLoad = useRef(true)
 
   const loadStandings = useCallback(async () => {
@@ -101,6 +105,32 @@ export default function Leaderboard({ poolId, pool }: Props) {
   }, [poolId, pool, supabase, standings])
 
   useEffect(() => { loadStandings() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load payout statuses for complete pools
+  useEffect(() => {
+    if (pool.status !== 'complete') return
+    async function loadPayouts() {
+      const res = await fetch(`/api/pools/${poolId}/payouts`)
+      if (res.ok) {
+        const data = await res.json()
+        const statuses: Record<string, string> = {}
+        for (const p of data.payments as Payment[]) {
+          statuses[p.team_id] = p.status
+        }
+        setPayoutStatuses(statuses)
+      }
+    }
+    loadPayouts()
+  }, [pool.status, poolId])
+
+  async function markPayoutSent(teamId: string, amount: number) {
+    await fetch(`/api/pools/${poolId}/payouts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ team_id: teamId, status: 'sent', amount }),
+    })
+    setPayoutStatuses(prev => ({ ...prev, [teamId]: 'sent' }))
+  }
 
   // Load current team
   useEffect(() => {
@@ -412,6 +442,82 @@ export default function Leaderboard({ poolId, pool }: Props) {
             </tbody>
           </table>
         </div>
+
+        {/* Victory Card for current user if they won a payout */}
+        {isComplete && myStanding && (() => {
+          const prizePool = pool.buy_in_amount * standings.length
+          const payouts = calculatePayouts(
+            standings.map(s => ({ team_id: s.team.id, team_name: s.team.owner_name, total: s.teamTotal, rank: s.rank })),
+            payoutRules,
+            prizePool
+          )
+          const myPayout = payouts.find(p => p.team_id === myStanding.team.id && p.amount > 0)
+          if (!myPayout) return null
+          return (
+            <div className="mt-6 max-w-sm mx-auto milestone-fade-in">
+              <VictoryCard
+                position={myPayout.rank}
+                ownerName={myStanding.team.owner_name}
+                poolName={pool.name}
+                prizeAmount={myPayout.amount}
+                score={formatScore(myStanding.teamTotal)}
+              />
+            </div>
+          )
+        })()}
+
+        {/* Payout Summary — Commissioner only */}
+        {isComplete && currentTeam?.is_commissioner && (() => {
+          const prizePool = pool.buy_in_amount * standings.length
+          const payouts = calculatePayouts(
+            standings.map(s => ({ team_id: s.team.id, team_name: s.team.owner_name, total: s.teamTotal, rank: s.rank })),
+            payoutRules,
+            prizePool
+          )
+          const winnersPayouts = payouts.filter(p => p.amount > 0)
+          const totalSent = winnersPayouts.filter(p => payoutStatuses[p.team_id] === 'sent').reduce((s, p) => s + p.amount, 0)
+
+          return (
+            <div className="mt-8 bg-white rounded-sm border border-muted-gray/20 overflow-hidden">
+              <div className="px-4 py-3 border-b border-muted-gray/20 bg-cream flex items-center justify-between">
+                <h2 className="font-serif font-semibold text-gray-700">Payout Summary</h2>
+                <div className="text-xs text-muted-gray">
+                  Prize Pool: <span className="font-semibold text-augusta">${prizePool}</span>
+                </div>
+              </div>
+              <div className="divide-y divide-muted-gray/20">
+                {winnersPayouts.map(p => {
+                  const isSent = payoutStatuses[p.team_id] === 'sent'
+                  return (
+                    <div key={p.team_id} className="px-4 py-3 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-muted-gray font-serif">#{p.rank}</span>
+                        <span className="font-medium">{p.team_name}</span>
+                        <span className="font-semibold text-score-green">${p.amount}</span>
+                      </div>
+                      <button
+                        onClick={() => !isSent && markPayoutSent(p.team_id, p.amount)}
+                        className={`text-xs px-3 py-2 min-h-[44px] rounded-sm ${
+                          isSent
+                            ? 'bg-score-green/10 text-score-green cursor-default'
+                            : 'bg-gray-100 text-muted-gray hover:bg-masters-gold/20 hover:text-masters-gold transition-colors'
+                        }`}
+                      >
+                        {isSent ? 'Sent' : 'Mark Sent'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="px-4 py-3 border-t border-muted-gray/20 bg-cream flex items-center justify-between text-sm">
+                <span className="text-muted-gray">Distributed</span>
+                <span className={totalSent === prizePool ? 'text-score-green font-semibold' : 'font-medium'}>
+                  ${totalSent} / ${prizePool}
+                </span>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* View Champion button */}
         {isComplete && winner && (

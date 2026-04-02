@@ -119,6 +119,19 @@ export default function PoolPage() {
     loadData()
   }
 
+  const paidCount = teams.filter(t => t.buy_in_paid).length
+  const totalExpected = pool.buy_in_amount * teams.length
+  const totalCollected = pool.buy_in_amount * paidCount
+
+  function paymentMethodLabel(method: string) {
+    switch (method) {
+      case 'e-transfer': return 'Interac e-Transfer'
+      case 'paypal': return 'PayPal'
+      case 'cash': return 'Cash'
+      default: return 'Other'
+    }
+  }
+
   // Shared pool config card
   const poolConfigCard = (
     <div className="bg-white rounded-sm p-4 mb-6 border border-muted-gray/20">
@@ -188,10 +201,16 @@ export default function PoolPage() {
 
           {/* Players list with paid toggles */}
           <div className="bg-white rounded-sm border border-muted-gray/20 overflow-hidden mb-6">
-            <div className="px-4 py-3 border-b border-muted-gray/20 bg-cream">
+            <div className="px-4 py-3 border-b border-muted-gray/20 bg-cream flex items-center justify-between">
               <h2 className="font-serif font-semibold text-gray-700">
                 Players ({teams.length})
               </h2>
+              <div className="text-xs text-muted-gray">
+                <span className={paidCount === teams.length ? 'text-score-green font-semibold' : ''}>
+                  ${totalCollected}
+                </span>
+                {' / $'}{totalExpected} collected
+              </div>
             </div>
             {teams.length === 0 && (
               <div className="px-4 py-8 text-center">
@@ -283,6 +302,55 @@ export default function PoolPage() {
         ) : (
           <div className="bg-white rounded-sm p-4 mb-6 border border-muted-gray/20 mt-4 text-center">
             <p className="font-serif italic text-muted-gray">You&apos;re viewing this pool as a spectator</p>
+          </div>
+        )}
+
+        {/* Payment instructions */}
+        {currentTeam && !currentTeam.buy_in_paid && pool.buy_in_amount > 0 && (
+          <div className="bg-masters-gold/10 rounded-sm p-4 mb-6 border border-masters-gold/30">
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-serif font-semibold text-sm">Buy-in: ${pool.buy_in_amount}</div>
+              <span className="text-xs px-2 py-1 rounded-sm bg-masters-gold/20 text-masters-gold font-medium">
+                Payment Pending
+              </span>
+            </div>
+            <div className="text-sm text-gray-700">
+              {pool.payment_method === 'paypal' && pool.payment_details ? (
+                <>
+                  Send via{' '}
+                  <a
+                    href={`https://paypal.me/${pool.payment_details.replace(/^(https?:\/\/)?(paypal\.me\/)?/, '')}/${pool.buy_in_amount}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-augusta underline font-medium"
+                  >
+                    PayPal
+                  </a>
+                </>
+              ) : (
+                <>
+                  <span className="text-muted-gray">Send via</span>{' '}
+                  <span className="font-medium">{paymentMethodLabel(pool.payment_method)}</span>
+                  {pool.payment_details && (
+                    <>
+                      <span className="text-muted-gray"> to </span>
+                      <span className="font-medium">{pool.payment_details}</span>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+            {pool.payment_method === 'e-transfer' && pool.payment_details && (
+              <div className="mt-2 text-xs text-muted-gray">
+                Memo: {pool.name} - {currentTeam.owner_name}
+              </div>
+            )}
+          </div>
+        )}
+        {currentTeam && currentTeam.buy_in_paid && (
+          <div className="bg-score-green/10 rounded-sm p-3 mb-6 border border-score-green/30 flex items-center justify-between">
+            <span className="text-sm font-medium text-score-green">Buy-in paid</span>
+            <span className="text-sm font-serif">${pool.buy_in_amount}</span>
           </div>
         )}
 

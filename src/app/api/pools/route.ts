@@ -14,6 +14,8 @@ export async function POST(request: NextRequest) {
     dropDeadlineRound,
     draftTimerSeconds,
     buyInAmount,
+    paymentMethod,
+    paymentDetails,
     payoutRules,
   } = body
 
@@ -38,6 +40,8 @@ export async function POST(request: NextRequest) {
       drop_deadline_round: dropDeadlineRound,
       draft_timer_seconds: draftTimerSeconds,
       buy_in_amount: buyInAmount,
+      payment_method: paymentMethod || 'cash',
+      payment_details: paymentDetails || null,
     })
     .select()
     .single()

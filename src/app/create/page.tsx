@@ -22,6 +22,8 @@ export default function CreatePool() {
     dropDeadlineRound: 2,
     draftTimerSeconds: 90,
     buyInAmount: 50,
+    paymentMethod: 'cash' as 'e-transfer' | 'paypal' | 'cash' | 'other',
+    paymentDetails: '',
   })
   const [payoutRules, setPayoutRules] = useState<PayoutRule[]>([
     { position: 1, percentage: 60 },
@@ -115,6 +117,41 @@ export default function CreatePool() {
               min={0}
               value={formData.buyInAmount}
               onChange={e => setFormData({ ...formData, buyInAmount: parseInt(e.target.value) })}
+              className={inputClass}
+            />
+          </div>
+
+          {/* Payment Method */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">How will players pay?</label>
+            <select
+              value={formData.paymentMethod}
+              onChange={e => setFormData({ ...formData, paymentMethod: e.target.value as 'e-transfer' | 'paypal' | 'cash' | 'other' })}
+              className={inputClass}
+            >
+              <option value="e-transfer">Interac e-Transfer</option>
+              <option value="paypal">PayPal</option>
+              <option value="cash">Cash</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {formData.paymentMethod === 'e-transfer' ? 'e-Transfer Email or Phone' :
+               formData.paymentMethod === 'paypal' ? 'PayPal.me Username or Email' :
+               'Payment Instructions'}
+            </label>
+            <input
+              type="text"
+              value={formData.paymentDetails}
+              onChange={e => setFormData({ ...formData, paymentDetails: e.target.value })}
+              placeholder={
+                formData.paymentMethod === 'e-transfer' ? 'your@email.com' :
+                formData.paymentMethod === 'paypal' ? 'paypal.me/yourhandle' :
+                formData.paymentMethod === 'cash' ? 'e.g., Pay me at the clubhouse' :
+                'How should players send payment?'
+              }
               className={inputClass}
             />
           </div>
