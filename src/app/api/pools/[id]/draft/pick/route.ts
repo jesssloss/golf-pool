@@ -69,41 +69,62 @@ export async function POST(
   const nextPick = draftState.current_pick + 1
 
   if (nextPick > draftState.total_picks) {
-    // Draft complete
+    // Draft complete - advance pick counter
     await supabase
       .from('draft_state')
       .update({ current_pick: nextPick, timer_expires_at: null })
       .eq('pool_id', params.id)
 
-    // Populate team_golfers from draft_picks
-    const { data: allPicks } = await supabase
-      .from('draft_picks')
-      .select('*')
-      .eq('pool_id', params.id)
+    if (pool.draft_mode === 'manual') {
+      // Manual mode: wait for commissioner to finalize via /draft/finalize
+    } else {
+      // Live mode: auto-finalize
+      try {
+        const { data: allPicks } = await supabase
+          .from('draft_picks')
+          .select('*')
+          .eq('pool_id', params.id)
 
-    if (allPicks) {
-      await supabase.from('team_golfers').insert(
-        allPicks.map(p => ({
-          pool_id: params.id,
-          team_id: p.team_id,
-          golfer_id: p.golfer_id,
-          golfer_name: p.golfer_name,
-        }))
-      )
+        if (allPicks) {
+          const { error: insertError } = await supabase.from('team_golfers').insert(
+            allPicks.map(p => ({
+              pool_id: params.id,
+              team_id: p.team_id,
+              golfer_id: p.golfer_id,
+              golfer_name: p.golfer_name,
+            }))
+          )
+          if (insertError) {
+            console.error('Auto-finalize: failed to insert team_golfers', insertError)
+            return NextResponse.json({ error: 'Failed to finalize draft' }, { status: 500 })
+          }
+        }
+
+        // Set pool to active
+        const { error: statusError } = await supabase
+          .from('pools')
+          .update({ status: 'active' })
+          .eq('id', params.id)
+        if (statusError) {
+          console.error('Auto-finalize: failed to update pool status', statusError)
+          return NextResponse.json({ error: 'Failed to activate pool' }, { status: 500 })
+        }
+      } catch (err) {
+        console.error('Auto-finalize: unexpected error', err)
+        return NextResponse.json({ error: 'Failed to finalize draft' }, { status: 500 })
+      }
     }
-
-    // Set pool to active
-    await supabase
-      .from('pools')
-      .update({ status: 'active' })
-      .eq('id', params.id)
   } else {
     // Advance to next pick
+    // No timer for manual mode or unlimited timer (draft_timer_seconds === 0)
+    const useTimer = pool.draft_mode !== 'manual' && pool.draft_timer_seconds > 0
     await supabase
       .from('draft_state')
       .update({
         current_pick: nextPick,
-        timer_expires_at: new Date(Date.now() + pool.draft_timer_seconds * 1000).toISOString(),
+        timer_expires_at: useTimer
+          ? new Date(Date.now() + pool.draft_timer_seconds * 1000).toISOString()
+          : null,
         updated_at: new Date().toISOString(),
       })
       .eq('pool_id', params.id)

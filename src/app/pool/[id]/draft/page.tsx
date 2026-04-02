@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getTeamForPick } from '@/lib/utils/snake-draft'
@@ -8,12 +8,13 @@ import type { Pool, Team, DraftState, DraftPick, GolferScore } from '@/types'
 import MilestoneBanner from '@/components/MilestoneBanner'
 import { MILESTONE_COPY, EMPTY_STATE_COPY } from '@/lib/constants/copy'
 import GreenJacketIcon from '@/components/GreenJacketIcon'
+import ManualDraftEntry from '@/components/ManualDraftEntry'
 
 export default function DraftPage() {
   const params = useParams()
   const router = useRouter()
   const poolId = params.id as string
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const [pool, setPool] = useState<Pool | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
@@ -30,6 +31,7 @@ export default function DraftPage() {
   const [pendingPick, setPendingPick] = useState<{ golfer_id: string; golfer_name: string } | null>(null)
 
   const pickerRef = useRef<HTMLDivElement>(null)
+  const hasRedirected = useRef(false)
 
   const loadData = useCallback(async () => {
     const [poolRes, teamsRes, draftRes, picksRes, golfersRes] = await Promise.all([
@@ -90,7 +92,8 @@ export default function DraftPage() {
   }, [draftState?.timer_expires_at])
 
   useEffect(() => {
-    if (pool?.status === 'active') {
+    if (pool?.status === 'active' && !hasRedirected.current) {
+      hasRedirected.current = true
       router.push(`/pool/${poolId}`)
     }
   }, [pool?.status, poolId, router])
@@ -121,6 +124,44 @@ export default function DraftPage() {
   const pickingTeam = currentPickInfo ? teams.find(t => t.id === currentPickInfo.team_id) : null
   const isMyTurn = currentTeam && pickingTeam && currentTeam.id === pickingTeam.id
   const isCommissioner = currentTeam && pool.commissioner_token === currentTeam.session_token
+  const isManualMode = pool.draft_mode === 'manual'
+  const isUnlimitedTimer = pool.draft_timer_seconds === 0
+
+  // Manual mode: non-commissioners see a waiting message
+  if (isManualMode && !isCommissioner && !loading) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center px-4">
+        <GreenJacketIcon size={32} />
+        <p className="font-serif italic text-muted-gray mt-3 text-center">
+          Your commissioner is entering picks. Check back soon.
+        </p>
+      </main>
+    )
+  }
+
+  // Manual mode: commissioner gets the batch entry UI
+  if (isManualMode && isCommissioner) {
+    return (
+      <main className="min-h-screen py-4 px-4">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center gap-2 mb-6">
+            <GreenJacketIcon size={24} />
+            <h1 className="text-2xl font-serif font-bold text-pimento">Enter Draft Results</h1>
+          </div>
+          <ManualDraftEntry
+            poolId={poolId}
+            teams={teams}
+            golfers={golfers}
+            playersPerTeam={pool.players_per_team}
+            existingPicks={picks.map(p => ({ team_id: p.team_id, golfer_id: p.golfer_id, golfer_name: p.golfer_name }))}
+            onPicksSaved={loadData}
+            onFinalize={finalizeDraft}
+            finalizing={picking}
+          />
+        </div>
+      </main>
+    )
+  }
 
   const pickedGolferIds = new Set(picks.map(p => p.golfer_id))
   const availableGolfers = golfers
@@ -161,8 +202,25 @@ export default function DraftPage() {
     }
   }
 
+  async function finalizeDraft() {
+    setPicking(true)
+    try {
+      const res = await fetch(`/api/pools/${poolId}/draft/finalize`, { method: 'POST' })
+      if (res.ok) {
+        hasRedirected.current = true
+        router.push(`/pool/${poolId}`)
+      } else {
+        const data = await res.json()
+        setPickError(data.error || 'Failed to finalize draft')
+      }
+    } catch {
+      setPickError('Failed to finalize draft. Check your connection.')
+    }
+    setPicking(false)
+  }
+
   // Auto-scroll to picker on mobile when it's your turn
-  const shouldShowPickerFirst = isMyTurn || (isCommissioner && timeLeft === 0)
+  const shouldShowPickerFirst = isManualMode ? true : (isMyTurn || (isCommissioner && timeLeft === 0))
 
   const rounds = pool.players_per_team
   const draftBoard: (DraftPick | null)[][] = []
@@ -315,25 +373,34 @@ export default function DraftPage() {
 
         {/* Current pick banner */}
         {!isComplete && pickingTeam && (
-          <div className={`rounded-sm p-4 mb-4 ${isMyTurn ? 'bg-pimento text-white' : 'bg-white border border-muted-gray/20'}`}>
+          <div className={`rounded-sm p-4 mb-4 ${
+            isManualMode || isMyTurn ? 'bg-pimento text-white' : 'bg-white border border-muted-gray/20'
+          }`}>
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm opacity-75">
-                  {timeLeft === 0
-                    ? `Time's up! Auto-picking for ${pickingTeam.owner_name}...`
-                    : isMyTurn ? MILESTONE_COPY.yourTurn : `${pickingTeam.owner_name} is picking...`}
+                  {isManualMode
+                    ? `Picking for ${pickingTeam.owner_name}`
+                    : timeLeft === 0 && timeLeft !== null
+                      ? `Time's up! Auto-picking for ${pickingTeam.owner_name}...`
+                      : isMyTurn ? MILESTONE_COPY.yourTurn : `${pickingTeam.owner_name} is picking...`}
                 </div>
                 <div className="text-lg font-serif font-bold">
                   Round {currentPickInfo?.round}
                 </div>
               </div>
-              {timeLeft !== null && (
+              {/* Timer: only show for live mode with a time limit */}
+              {!isManualMode && !isUnlimitedTimer && timeLeft !== null && (
                 <div className={`text-3xl font-mono font-bold ${timeLeft <= 10 ? (isMyTurn ? 'text-cheddar' : 'text-score-red') : ''}`}>
                   {timeLeft === 0 ? '0:00' : `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`}
                 </div>
               )}
+              {!isManualMode && isUnlimitedTimer && (
+                <div className="text-sm opacity-75 font-serif italic">No time limit</div>
+              )}
             </div>
-            {timeLeft === 0 && isCommissioner && !autoPickTriggered && (
+            {/* Auto-pick button: only for live mode with timer that expired */}
+            {!isManualMode && !isUnlimitedTimer && timeLeft === 0 && isCommissioner && !autoPickTriggered && (
               <div className="mt-2">
                 <button
                   onClick={autoPickBestAvailable}
@@ -349,7 +416,17 @@ export default function DraftPage() {
         {isComplete && (
           <div className="bg-pimento text-white rounded-sm p-4 mb-4 text-center">
             <MilestoneBanner text={MILESTONE_COPY.draftComplete} />
-            <p className="text-sm opacity-75 mt-1">Redirecting to leaderboard...</p>
+            {isManualMode && isCommissioner ? (
+              <button
+                onClick={finalizeDraft}
+                disabled={picking}
+                className="mt-3 bg-cheddar text-pimento-dark px-6 py-3 rounded-sm font-semibold hover:bg-cheddar/90 transition-colors disabled:opacity-50 min-h-[44px]"
+              >
+                {picking ? 'Finalizing...' : 'Finalize Draft'}
+              </button>
+            ) : (
+              <p className="text-sm opacity-75 mt-1">Redirecting to leaderboard...</p>
+            )}
           </div>
         )}
 

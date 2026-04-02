@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -16,7 +16,7 @@ export default function TeamDetail() {
   const params = useParams()
   const poolId = params.id as string
   const teamId = params.teamId as string
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const [pool, setPool] = useState<Pool | null>(null)
   const [team, setTeam] = useState<Team | null>(null)

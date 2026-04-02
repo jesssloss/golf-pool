@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Pool, Team, PayoutRule } from '@/types'
@@ -13,7 +13,7 @@ export default function PoolPage() {
   const params = useParams()
   const router = useRouter()
   const poolId = params.id as string
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const [pool, setPool] = useState<Pool | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
@@ -112,6 +112,11 @@ export default function PoolPage() {
     if (res.ok) router.push(`/pool/${poolId}/draft`)
   }
 
+  async function enterPicks() {
+    const res = await fetch(`/api/pools/${poolId}/draft/start`, { method: 'POST' })
+    if (res.ok) router.push(`/pool/${poolId}/draft`)
+  }
+
   async function togglePaid(teamId: string, currentPaid: boolean) {
     await fetch(`/api/pools/${poolId}/teams/${teamId}/paid`, {
       method: 'POST',
@@ -151,8 +156,12 @@ export default function PoolPage() {
           <div className="text-xs text-muted-gray">Count Best</div>
         </div>
         <div>
-          <div className="text-2xl font-serif font-bold text-pimento">{pool.draft_timer_seconds}s</div>
-          <div className="text-xs text-muted-gray">Draft Timer</div>
+          <div className="text-2xl font-serif font-bold text-pimento">
+            {pool.draft_mode === 'manual' ? 'Manual' : pool.draft_timer_seconds === 0 ? 'None' : `${pool.draft_timer_seconds}s`}
+          </div>
+          <div className="text-xs text-muted-gray">
+            {pool.draft_mode === 'manual' ? 'Draft Mode' : 'Draft Timer'}
+          </div>
         </div>
       </div>
       {payoutRules.length > 0 && (
@@ -260,13 +269,23 @@ export default function PoolPage() {
             >
               Randomize Draft Order
             </button>
-            <button
-              onClick={startDraft}
-              disabled={teams.length < 2}
-              className="w-full py-3 px-6 bg-pimento text-white rounded-sm font-semibold hover:bg-pimento-dark transition-colors disabled:opacity-50"
-            >
-              Start Draft
-            </button>
+            {pool.draft_mode === 'manual' ? (
+              <button
+                onClick={enterPicks}
+                disabled={teams.length < 2}
+                className="w-full py-3 px-6 bg-pimento text-white rounded-sm font-semibold hover:bg-pimento-dark transition-colors disabled:opacity-50"
+              >
+                Enter Picks
+              </button>
+            ) : (
+              <button
+                onClick={startDraft}
+                disabled={teams.length < 2}
+                className="w-full py-3 px-6 bg-pimento text-white rounded-sm font-semibold hover:bg-pimento-dark transition-colors disabled:opacity-50"
+              >
+                Start Draft
+              </button>
+            )}
           </div>
         </div>
       </main>

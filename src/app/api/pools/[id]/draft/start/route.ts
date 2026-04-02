@@ -79,13 +79,17 @@ export async function POST(
   const totalPicks = teams.length * pool.players_per_team
 
   // Create draft state
+  // No timer for manual mode or unlimited timer (draft_timer_seconds === 0)
+  const useTimer = pool.draft_mode !== 'manual' && pool.draft_timer_seconds > 0
   await supabase
     .from('draft_state')
     .insert({
       pool_id: params.id,
       current_pick: 1,
       total_picks: totalPicks,
-      timer_expires_at: new Date(Date.now() + pool.draft_timer_seconds * 1000).toISOString(),
+      timer_expires_at: useTimer
+        ? new Date(Date.now() + pool.draft_timer_seconds * 1000).toISOString()
+        : null,
     })
 
   // Update pool status

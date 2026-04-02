@@ -21,6 +21,7 @@ export default function CreatePool() {
     missedCutScore: 80,
     dropDeadlineRound: 2,
     draftTimerSeconds: 90,
+    draftMode: 'live' as 'live' | 'manual',
     buyInAmount: 50,
     paymentMethod: 'cash' as 'e-transfer' | 'paypal' | 'cash' | 'other',
     paymentDetails: '',
@@ -80,10 +81,6 @@ export default function CreatePool() {
     <main className="min-h-screen py-8 px-4">
       <div className="max-w-xl mx-auto">
         <h1 className="text-3xl font-serif font-bold text-pimento mb-8">Create Your Pool</h1>
-
-        {error && (
-          <div className="bg-red-50 text-score-red p-3 rounded-sm mb-4 text-sm">{error}</div>
-        )}
 
         {error && (
           <div className="bg-red-50 text-score-red p-3 rounded-sm mb-4 text-sm">{error}</div>
@@ -202,6 +199,40 @@ export default function CreatePool() {
             </div>
           </div>
 
+          {/* Draft Mode */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Draft Mode</label>
+            <div className="flex gap-0 rounded-sm overflow-hidden border border-muted-gray/30">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, draftMode: 'live' })}
+                className={`flex-1 py-2.5 px-4 text-sm font-semibold transition-colors min-h-[44px] ${
+                  formData.draftMode === 'live'
+                    ? 'bg-pimento text-white'
+                    : 'bg-white text-muted-gray hover:bg-cream'
+                }`}
+              >
+                Live Draft
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, draftMode: 'manual' })}
+                className={`flex-1 py-2.5 px-4 text-sm font-semibold transition-colors min-h-[44px] ${
+                  formData.draftMode === 'manual'
+                    ? 'bg-pimento text-white'
+                    : 'bg-white text-muted-gray hover:bg-cream'
+                }`}
+              >
+                Manual Entry
+              </button>
+            </div>
+            <p className="text-xs text-muted-gray mt-1">
+              {formData.draftMode === 'live'
+                ? 'Everyone drafts in real time with a pick timer'
+                : 'Commissioner enters all picks (collect picks via text, email, etc.)'}
+            </p>
+          </div>
+
           {/* Advanced Settings */}
           <div>
             <button
@@ -270,18 +301,41 @@ export default function CreatePool() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Draft Timer (seconds)</label>
-                  <input
-                    type="number"
-                    min={30}
-                    max={300}
-                    value={formData.draftTimerSeconds}
-                    onChange={e => setFormData({ ...formData, draftTimerSeconds: parseInt(e.target.value) })}
-                    className="w-full max-w-[200px] px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-pimento focus:border-transparent"
-                  />
-                  <p className="text-xs text-muted-gray mt-1">Time per pick before auto-draft kicks in</p>
-                </div>
+                {/* Draft Timer - only shown for live draft mode */}
+                {formData.draftMode === 'live' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Draft Timer</label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: '30s', value: 30 },
+                        { label: '60s', value: 60 },
+                        { label: '90s', value: 90 },
+                        { label: '120s', value: 120 },
+                        { label: '180s', value: 180 },
+                        { label: '300s', value: 300 },
+                        { label: 'Unlimited', value: 0 },
+                      ].map(opt => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, draftTimerSeconds: opt.value })}
+                          className={`px-3 py-2 text-sm rounded-sm font-medium transition-colors min-h-[44px] ${
+                            formData.draftTimerSeconds === opt.value
+                              ? 'bg-cheddar text-pimento-dark border border-cheddar'
+                              : 'bg-white text-muted-gray border border-muted-gray/30 hover:bg-cream'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-gray mt-1">
+                      {formData.draftTimerSeconds === 0
+                        ? 'No time limit per pick'
+                        : 'Time per pick before auto-draft kicks in'}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>

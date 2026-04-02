@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Pool, Team, TeamGolfer, GolferScore, PayoutRule } from '@/types'
@@ -27,7 +27,7 @@ interface TeamStanding {
 }
 
 export default function Leaderboard({ poolId, pool }: Props) {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [standings, setStandings] = useState<TeamStanding[]>([])
   const [loading, setLoading] = useState(true)
   const [showJacketCard, setShowJacketCard] = useState(false)
@@ -39,6 +39,7 @@ export default function Leaderboard({ poolId, pool }: Props) {
   const [copied, setCopied] = useState(false)
   const [payoutStatuses, setPayoutStatuses] = useState<Record<string, string>>({})
   const isFirstLoad = useRef(true)
+  const standingsRef = useRef<TeamStanding[]>([])
 
   const loadStandings = useCallback(async () => {
     const [teamsRes, tgRes, scoresRes, rulesRes] = await Promise.all([
@@ -94,15 +95,16 @@ export default function Leaderboard({ poolId, pool }: Props) {
     // Track previous ranks for movement arrows (skip first load)
     if (!isFirstLoad.current) {
       const currentRanks: Record<string, number> = {}
-      standings.forEach(s => { currentRanks[s.team.id] = s.rank })
+      standingsRef.current.forEach(s => { currentRanks[s.team.id] = s.rank })
       setPrevRanks(currentRanks)
     }
     isFirstLoad.current = false
 
+    standingsRef.current = teamStandings
     setStandings(teamStandings)
     setLoading(false)
     setLastUpdated(new Date())
-  }, [poolId, pool, supabase, standings])
+  }, [poolId, pool, supabase])
 
   useEffect(() => { loadStandings() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
