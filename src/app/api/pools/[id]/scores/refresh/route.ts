@@ -11,14 +11,29 @@ export async function POST(
   const sessionToken = cookieStore.get(`session_token_${params.id}`)?.value
   const supabase = createServerSupabaseClient()
 
-  // Verify commissioner
+  // Verify the caller is a member of this pool
   const { data: pool } = await supabase
     .from('pools')
-    .select('*')
+    .select('id, status')
     .eq('id', params.id)
     .single()
 
-  if (!pool || pool.commissioner_token !== sessionToken) {
+  if (!pool) {
+    return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
+  }
+
+  if (sessionToken) {
+    const { data: team } = await supabase
+      .from('teams')
+      .select('id')
+      .eq('pool_id', params.id)
+      .eq('session_token', sessionToken)
+      .single()
+
+    if (!team) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+  } else {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 

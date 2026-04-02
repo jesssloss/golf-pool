@@ -83,7 +83,7 @@ export default function PoolPage() {
   const isCommissioner = currentTeam?.is_commissioner
 
   if (pool.status === 'active' || pool.status === 'complete') {
-    return <Leaderboard poolId={poolId} pool={pool} currentTeam={currentTeam} />
+    return <Leaderboard poolId={poolId} pool={pool} />
   }
 
   if (pool.status === 'drafting') {
@@ -119,122 +119,115 @@ export default function PoolPage() {
     loadData()
   }
 
-  return (
-    <main className="min-h-screen py-8 px-4">
-      <div className="max-w-2xl mx-auto">
-        <div className="mb-2">
-          <h1 className="text-3xl font-serif font-bold text-augusta">{pool.name}</h1>
-          <p className="text-muted-gray mt-1">{pool.tournament_name}</p>
+  // Shared pool config card
+  const poolConfigCard = (
+    <div className="bg-white rounded-sm p-4 mb-6 border border-muted-gray/20">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+        <div>
+          <div className="text-2xl font-serif font-bold text-augusta">${pool.buy_in_amount}</div>
+          <div className="text-xs text-muted-gray">Buy-in</div>
         </div>
-
-        {/* Milestone: pool created */}
-        <MilestoneBanner text={MILESTONE_COPY.poolCreated} />
-
-        {/* Invite link */}
-        <div className="bg-white rounded-sm p-4 mb-6 border border-muted-gray/20 mt-4">
-          <div className="text-sm text-muted-gray mb-1">Share this link to invite players</div>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 bg-cream px-3 py-2 rounded-sm text-sm font-mono break-all">
-              {inviteUrl}
-            </code>
-            <button
-              onClick={() => navigator.clipboard.writeText(inviteUrl)}
-              className="px-3 py-2 bg-augusta text-white text-sm rounded-sm hover:bg-augusta-dark transition-colors whitespace-nowrap"
-            >
-              Copy
-            </button>
-          </div>
+        <div>
+          <div className="text-2xl font-serif font-bold text-augusta">{pool.players_per_team}</div>
+          <div className="text-xs text-muted-gray">Golfers/Team</div>
         </div>
-
-        {/* Pool config summary */}
-        <div className="bg-white rounded-sm p-4 mb-6 border border-muted-gray/20">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div>
-              <div className="text-2xl font-serif font-bold text-augusta">${pool.buy_in_amount}</div>
-              <div className="text-xs text-muted-gray">Buy-in</div>
-            </div>
-            <div>
-              <div className="text-2xl font-serif font-bold text-augusta">{pool.players_per_team}</div>
-              <div className="text-xs text-muted-gray">Golfers/Team</div>
-            </div>
-            <div>
-              <div className="text-2xl font-serif font-bold text-augusta">{pool.scoring_players}</div>
-              <div className="text-xs text-muted-gray">Count Best</div>
-            </div>
-            <div>
-              <div className="text-2xl font-serif font-bold text-augusta">{pool.draft_timer_seconds}s</div>
-              <div className="text-xs text-muted-gray">Draft Timer</div>
-            </div>
-          </div>
-          {payoutRules.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-muted-gray/20">
-              <div className="text-xs text-muted-gray mb-2">Payouts</div>
-              <div className="flex gap-4">
-                {payoutRules.map(r => (
-                  <div key={r.position} className="text-sm">
-                    <span className="text-muted-gray">#{r.position}:</span>{' '}
-                    <span className="font-semibold">{r.percentage}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+        <div>
+          <div className="text-2xl font-serif font-bold text-augusta">{pool.scoring_players}</div>
+          <div className="text-xs text-muted-gray">Count Best</div>
         </div>
-
-        {/* Players list */}
-        <div className="bg-white rounded-sm border border-muted-gray/20 overflow-hidden mb-6">
-          <div className="px-4 py-3 border-b border-muted-gray/20 bg-cream">
-            <h2 className="font-serif font-semibold text-gray-700">
-              Players ({teams.length})
-            </h2>
-          </div>
-          {teams.length === 0 && (
-            <div className="px-4 py-8 text-center">
-              <p className="font-serif italic text-muted-gray">{EMPTY_STATE_COPY.preDraftNoPlayers}</p>
-            </div>
-          )}
-          <div className="divide-y divide-muted-gray/20">
-            {teams.map((team, i) => (
-              <div key={team.id} className="px-4 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-muted-gray w-6 font-serif">{team.draft_position || i + 1}</span>
-                  <span className="font-medium">
-                    {team.owner_name}
-                    {team.is_commissioner && (
-                      <span className="ml-2 text-xs bg-augusta text-white px-2 py-0.5 rounded-sm">
-                        Commissioner
-                      </span>
-                    )}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {isCommissioner && (
-                    <button
-                      onClick={() => togglePaid(team.id, team.buy_in_paid)}
-                      className={`text-xs px-2 py-1 rounded-sm ${
-                        team.buy_in_paid
-                          ? 'bg-score-green/10 text-score-green'
-                          : 'bg-gray-100 text-muted-gray'
-                      }`}
-                    >
-                      {team.buy_in_paid ? 'Paid' : 'Unpaid'}
-                    </button>
-                  )}
-                  {!isCommissioner && (
-                    <span className={`text-xs px-2 py-1 rounded-sm ${
-                      team.buy_in_paid ? 'text-score-green' : 'text-muted-gray'
-                    }`}>
-                      {team.buy_in_paid ? 'Paid' : 'Unpaid'}
-                    </span>
-                  )}
-                </div>
+        <div>
+          <div className="text-2xl font-serif font-bold text-augusta">{pool.draft_timer_seconds}s</div>
+          <div className="text-xs text-muted-gray">Draft Timer</div>
+        </div>
+      </div>
+      {payoutRules.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-muted-gray/20">
+          <div className="text-xs text-muted-gray mb-2">Payouts</div>
+          <div className="flex gap-4">
+            {payoutRules.map(r => (
+              <div key={r.position} className="text-sm">
+                <span className="text-muted-gray">#{r.position}:</span>{' '}
+                <span className="font-semibold">{r.percentage}%</span>
               </div>
             ))}
           </div>
         </div>
+      )}
+    </div>
+  )
 
-        {/* Commissioner controls */}
-        {isCommissioner && (
+  // ── Commissioner Lobby ──
+  if (isCommissioner) {
+    return (
+      <main className="min-h-screen py-8 px-4">
+        <div className="max-w-2xl mx-auto">
+          <div className="mb-2">
+            <h1 className="text-3xl font-serif font-bold text-augusta">{pool.name}</h1>
+            <p className="text-muted-gray mt-1">{pool.tournament_name}</p>
+          </div>
+
+          <MilestoneBanner text={MILESTONE_COPY.poolCreated} />
+
+          {/* Invite link — commissioner only */}
+          <div className="bg-white rounded-sm p-4 mb-6 border border-muted-gray/20 mt-4">
+            <div className="text-sm text-muted-gray mb-1">Share this link to invite players</div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-cream px-3 py-2 rounded-sm text-sm font-mono break-all">
+                {inviteUrl}
+              </code>
+              <button
+                onClick={() => navigator.clipboard.writeText(inviteUrl)}
+                className="px-3 py-2 bg-augusta text-white text-sm rounded-sm hover:bg-augusta-dark transition-colors whitespace-nowrap"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+
+          {poolConfigCard}
+
+          {/* Players list with paid toggles */}
+          <div className="bg-white rounded-sm border border-muted-gray/20 overflow-hidden mb-6">
+            <div className="px-4 py-3 border-b border-muted-gray/20 bg-cream">
+              <h2 className="font-serif font-semibold text-gray-700">
+                Players ({teams.length})
+              </h2>
+            </div>
+            {teams.length === 0 && (
+              <div className="px-4 py-8 text-center">
+                <p className="font-serif italic text-muted-gray">{EMPTY_STATE_COPY.preDraftNoPlayers}</p>
+              </div>
+            )}
+            <div className="divide-y divide-muted-gray/20">
+              {teams.map((team, i) => (
+                <div key={team.id} className="px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-muted-gray w-6 font-serif">{team.draft_position || i + 1}</span>
+                    <span className="font-medium">
+                      {team.owner_name}
+                      {team.is_commissioner && (
+                        <span className="ml-2 text-xs bg-augusta text-white px-2 py-0.5 rounded-sm">
+                          Commissioner
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => togglePaid(team.id, team.buy_in_paid)}
+                    className={`text-xs px-2 py-1 rounded-sm ${
+                      team.buy_in_paid
+                        ? 'bg-score-green/10 text-score-green'
+                        : 'bg-gray-100 text-muted-gray'
+                    }`}
+                  >
+                    {team.buy_in_paid ? 'Paid' : 'Unpaid'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Commissioner controls */}
           <div className="space-y-3">
             <button
               onClick={randomizeDraftOrder}
@@ -250,13 +243,102 @@ export default function PoolPage() {
               Start Draft
             </button>
           </div>
-        )}
+        </div>
+      </main>
+    )
+  }
 
-        {!isCommissioner && !currentTeam && (
-          <div className="text-center py-8">
-            <p className="font-serif italic text-muted-gray">Waiting for commissioner to start the draft...</p>
+  // ── Participant Lobby ──
+  const myDraftPosition = currentTeam?.draft_position
+  const allHavePositions = teams.every(t => t.draft_position !== null)
+
+  return (
+    <main className="min-h-screen py-8 px-4">
+      <div className="max-w-2xl mx-auto">
+        <div className="mb-2">
+          <h1 className="text-3xl font-serif font-bold text-augusta">{pool.name}</h1>
+          <p className="text-muted-gray mt-1">{pool.tournament_name}</p>
+        </div>
+
+        {/* Participant status card */}
+        {currentTeam ? (
+          <div className="bg-white rounded-sm p-4 mb-6 border border-augusta/30 mt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-muted-gray">You&apos;re in</div>
+                <div className="font-serif font-semibold text-lg">{currentTeam.owner_name}</div>
+              </div>
+              {myDraftPosition && allHavePositions ? (
+                <div className="text-right">
+                  <div className="text-sm text-muted-gray">Draft Position</div>
+                  <div className="text-3xl font-serif font-bold text-augusta">#{myDraftPosition}</div>
+                </div>
+              ) : (
+                <div className="text-right">
+                  <div className="text-xs text-muted-gray italic">Draft order not set yet</div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-sm p-4 mb-6 border border-muted-gray/20 mt-4 text-center">
+            <p className="font-serif italic text-muted-gray">You&apos;re viewing this pool as a spectator</p>
           </div>
         )}
+
+        {poolConfigCard}
+
+        {/* Player roster — read-only */}
+        <div className="bg-white rounded-sm border border-muted-gray/20 overflow-hidden mb-6">
+          <div className="px-4 py-3 border-b border-muted-gray/20 bg-cream">
+            <h2 className="font-serif font-semibold text-gray-700">
+              Players ({teams.length})
+            </h2>
+          </div>
+          {teams.length === 0 && (
+            <div className="px-4 py-8 text-center">
+              <p className="font-serif italic text-muted-gray">{EMPTY_STATE_COPY.preDraftNoPlayers}</p>
+            </div>
+          )}
+          <div className="divide-y divide-muted-gray/20">
+            {teams.map((team, i) => {
+              const isMe = currentTeam?.id === team.id
+              return (
+                <div key={team.id} className={`px-4 py-3 flex items-center justify-between ${isMe ? 'bg-augusta/5' : ''}`}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-muted-gray w-6 font-serif">{team.draft_position || i + 1}</span>
+                    <span className={`font-medium ${isMe ? 'text-augusta' : ''}`}>
+                      {team.owner_name}
+                      {isMe && (
+                        <span className="ml-2 text-xs text-augusta/60">(you)</span>
+                      )}
+                      {team.is_commissioner && (
+                        <span className="ml-2 text-xs bg-augusta text-white px-2 py-0.5 rounded-sm">
+                          Commissioner
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-sm ${
+                    team.buy_in_paid ? 'text-score-green' : 'text-muted-gray'
+                  }`}>
+                    {team.buy_in_paid ? 'Paid' : 'Unpaid'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Waiting state */}
+        <div className="text-center py-6">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-cream rounded-sm border border-muted-gray/20">
+            <span className="inline-block w-2 h-2 bg-masters-gold rounded-full animate-pulse" />
+            <span className="font-serif italic text-muted-gray text-sm">
+              Waiting for the commissioner to start the draft...
+            </span>
+          </div>
+        </div>
       </div>
     </main>
   )

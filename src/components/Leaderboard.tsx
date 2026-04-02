@@ -14,7 +14,6 @@ import GreenJacketCard from './GreenJacketCard'
 interface Props {
   poolId: string
   pool: Pool
-  currentTeam: Team | null
 }
 
 interface TeamStanding {
@@ -24,11 +23,13 @@ interface TeamStanding {
   rank: number
 }
 
-export default function Leaderboard({ poolId, pool, currentTeam }: Props) {
+export default function Leaderboard({ poolId, pool }: Props) {
   const supabase = createClient()
   const [standings, setStandings] = useState<TeamStanding[]>([])
   const [loading, setLoading] = useState(true)
   const [showJacketCard, setShowJacketCard] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   const loadStandings = useCallback(async () => {
     const [teamsRes, tgRes, scoresRes] = await Promise.all([
@@ -81,10 +82,12 @@ export default function Leaderboard({ poolId, pool, currentTeam }: Props) {
 
     setStandings(teamStandings)
     setLoading(false)
+    setLastUpdated(new Date())
   }, [poolId, pool, supabase])
 
   useEffect(() => { loadStandings() }, [loadStandings])
 
+  // Realtime subscription for instant updates when cron writes scores
   useEffect(() => {
     const channel = supabase
       .channel('scores-changes')
@@ -95,7 +98,27 @@ export default function Leaderboard({ poolId, pool, currentTeam }: Props) {
     return () => { supabase.removeChannel(channel) }
   }, [poolId, supabase, loadStandings])
 
-  const isCommissioner = currentTeam?.is_commissioner
+  // Auto-refresh: pull fresh ESPN scores every 60s for active pools
+  useEffect(() => {
+    if (pool.status !== 'active') return
+    const interval = setInterval(async () => {
+      await fetch(`/api/pools/${poolId}/scores/refresh`, { method: 'POST' })
+      // Realtime subscription will pick up the DB changes automatically,
+      // but loadStandings as fallback
+      loadStandings()
+    }, 60_000)
+    return () => clearInterval(interval)
+  }, [pool.status, poolId, loadStandings])
+
+  const handleManualRefresh = async () => {
+    setRefreshing(true)
+    try {
+      await fetch(`/api/pools/${poolId}/scores/refresh`, { method: 'POST' })
+      await loadStandings()
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   function formatScore(score: number): string {
     if (score === 0) return 'E'
@@ -131,17 +154,20 @@ export default function Leaderboard({ poolId, pool, currentTeam }: Props) {
             <h1 className="text-2xl font-serif font-bold text-augusta">{pool.name}</h1>
             <p className="text-sm text-muted-gray">{pool.tournament_name}</p>
           </div>
-          {isCommissioner && (
+          <div className="flex items-center gap-3">
+            {lastUpdated && (
+              <span className="text-xs text-muted-gray">
+                Updated {lastUpdated.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              </span>
+            )}
             <button
-              onClick={async () => {
-                await fetch(`/api/pools/${poolId}/scores/refresh`, { method: 'POST' })
-                loadStandings()
-              }}
-              className="text-sm px-3 py-1 border border-augusta text-augusta rounded-sm hover:bg-augusta hover:text-white transition-colors"
+              onClick={handleManualRefresh}
+              disabled={refreshing}
+              className="text-sm px-3 py-1 border border-augusta text-augusta rounded-sm hover:bg-augusta hover:text-white transition-colors disabled:opacity-50"
             >
-              Refresh Scores
+              {refreshing ? 'Updating...' : 'Refresh'}
             </button>
-          )}
+          </div>
         </div>
 
         {/* Milestone banners */}
