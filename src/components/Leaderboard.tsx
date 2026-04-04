@@ -39,6 +39,7 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
   const [payoutRules, setPayoutRules] = useState<PayoutRule[]>([])
   const [copied, setCopied] = useState(false)
   const [payoutStatuses, setPayoutStatuses] = useState<Record<string, string>>({})
+  const [isCommissioner, setIsCommissioner] = useState(false)
   const isFirstLoad = useRef(true)
   const standingsRef = useRef<TeamStanding[]>([])
 
@@ -144,6 +145,7 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
       if (res.ok) {
         const data = await res.json()
         if (data.team) setCurrentTeam(data.team)
+        setIsCommissioner(data.isCommissioner ?? false)
       }
     }
     loadMe()
@@ -504,7 +506,7 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
         })()}
 
         {/* Payout Summary — Commissioner only, hidden in readOnly */}
-        {!readOnly && isComplete && currentTeam?.is_commissioner && (() => {
+        {!readOnly && isComplete && isCommissioner && (() => {
           const prizePool = pool.buy_in_amount * standings.length
           const payouts = calculatePayouts(
             standings.map(s => ({ team_id: s.team.id, team_name: s.team.owner_name, total: s.teamTotal, rank: s.rank })),
@@ -557,7 +559,7 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
         })()}
 
         {/* Seed Test Scores — Commissioner only, dev tool */}
-        {!readOnly && currentTeam?.is_commissioner && pool.status === 'active' && (
+        {!readOnly && isCommissioner && pool.status === 'active' && (
           <div className="mt-6 text-center">
             <button
               onClick={async () => {
