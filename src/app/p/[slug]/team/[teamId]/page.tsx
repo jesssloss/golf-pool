@@ -119,8 +119,10 @@ export default function PublicTeamDetail() {
   useEffect(() => { loadData() }, [loadData])
 
   // Fetch hole-by-hole scores when a golfer is expanded
+  const [noDataGolfers, setNoDataGolfers] = useState<Set<string>>(new Set())
+
   const fetchHoleScores = useCallback(async (golferId: string, poolId: string) => {
-    if (holeScores[golferId] || holeScoresLoading[golferId]) return
+    if (holeScores[golferId] || holeScoresLoading[golferId] || noDataGolfers.has(golferId)) return
 
     setHoleScoresLoading(prev => ({ ...prev, [golferId]: true }))
 
@@ -132,7 +134,9 @@ export default function PublicTeamDetail() {
       const res = await fetch(`/api/pools/${poolId}/hole-scores?${queryParams}`)
       if (res.ok) {
         const data = await res.json()
-        if (data.scores && data.scores.length > 0) {
+        if (data.noData) {
+          setNoDataGolfers(prev => new Set(prev).add(golferId))
+        } else if (data.scores && data.scores.length > 0) {
           setHoleScores(prev => ({ ...prev, [golferId]: data.scores }))
           setHoleScoresLive(prev => ({ ...prev, [golferId]: !data.fromCache || data.scores.length > 0 }))
         }
@@ -142,7 +146,7 @@ export default function PublicTeamDetail() {
     } finally {
       setHoleScoresLoading(prev => ({ ...prev, [golferId]: false }))
     }
-  }, [holeScores, holeScoresLoading])
+  }, [holeScores, holeScoresLoading, noDataGolfers])
 
   // Trigger fetch when golfer is expanded
   useEffect(() => {

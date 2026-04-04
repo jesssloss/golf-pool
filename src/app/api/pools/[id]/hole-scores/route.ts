@@ -89,7 +89,16 @@ export async function GET(
       try {
         const scorecards = await slashGolfProvider.getScorecard(playerId)
 
-        // Log API call
+        // Only log the call and cache if we got actual data back
+        if (scorecards.length === 0) {
+          return NextResponse.json({
+            scores: cachedScores || [],
+            fromCache: true,
+            noData: true,
+          })
+        }
+
+        // Log API call (only when we got useful data)
         await supabase.from('api_usage').insert({
           provider: 'slashgolf',
           endpoint: 'scorecard',
