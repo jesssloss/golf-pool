@@ -556,6 +556,26 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
           )
         })()}
 
+        {/* Seed Test Scores — Commissioner only, dev tool */}
+        {!readOnly && currentTeam?.is_commissioner && pool.status === 'active' && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={async () => {
+                const res = await fetch(`/api/pools/${poolId}/seed-scores`, { method: 'POST' })
+                if (res.ok) {
+                  await loadStandings()
+                } else {
+                  const data = await res.json()
+                  alert(data.error || 'Failed to seed scores')
+                }
+              }}
+              className="px-4 py-2 min-h-[44px] text-sm border border-muted-gray/30 text-muted-gray rounded-sm hover:bg-cream transition-colors"
+            >
+              Load Test Scores (Mid-Round 2)
+            </button>
+          </div>
+        )}
+
         {/* View Champion button */}
         {isComplete && winner && (
           <div className="mt-6 text-center">
