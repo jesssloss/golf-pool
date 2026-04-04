@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Pool, Team, TeamGolfer, GolferScore, PayoutRule } from '@/types'
 import { MILESTONE_COPY, EMPTY_STATE_COPY } from '@/lib/constants/copy'
+import { useRouter } from 'next/navigation'
 import FlipScore from './FlipScore'
 import StatusBadge from './StatusBadge'
 import GreenJacketIcon from './GreenJacketIcon'
@@ -28,6 +29,7 @@ interface TeamStanding {
 }
 
 export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
+  const router = useRouter()
   // Build team detail URL based on context (public slug vs private pool)
   const teamUrl = (teamId: string) =>
     readOnly && pool.slug
@@ -436,7 +438,8 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
                 return (
                   <tr
                     key={s.team.id}
-                    className={`border-b border-muted-gray/20 ${
+                    onClick={() => router.push(teamUrl(s.team.id))}
+                    className={`border-b border-muted-gray/20 cursor-pointer hover:bg-pimento/5 transition-colors ${
                       isWinner ? 'bg-cheddar/10' :
                       isMe ? 'bg-pimento/5' :
                       idx % 2 === 0 ? 'bg-white' : 'bg-cream'
