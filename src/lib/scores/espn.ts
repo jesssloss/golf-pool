@@ -37,7 +37,7 @@ export class ESPNScoresProvider implements ScoresProvider {
     return competitors.map(c => {
       const rounds = (c.linescores || []).map((ls, i) => ({
         round_number: i + 1,
-        score_to_par: ls.value - 72, // Par 72 for Augusta
+        score_to_par: ls.value - 72, // Par 72 — adjust if your course differs
       }))
 
       const totalToPar = this.parseTotalToPar(c.score)

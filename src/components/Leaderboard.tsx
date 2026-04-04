@@ -278,13 +278,13 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
         {pool.slug && (
           <div className="bg-white rounded-sm p-3 mb-4 border border-muted-gray/20 flex items-center gap-2">
             <code className="flex-1 text-sm font-mono text-pimento truncate">
-              pimento.bet/p/{pool.slug}
+              {typeof window !== 'undefined' ? window.location.host : ''}/p/{pool.slug}
             </code>
             <button
               onClick={() => {
                 const url = typeof window !== 'undefined'
                   ? `${window.location.origin}/p/${pool.slug}`
-                  : `https://pimento.bet/p/${pool.slug}`
+                  : `/p/${pool.slug}`
                 navigator.clipboard.writeText(url)
                 setCopied(true)
                 setTimeout(() => setCopied(false), 2000)

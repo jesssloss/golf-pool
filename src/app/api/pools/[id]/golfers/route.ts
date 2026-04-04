@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { MASTERS_FIELD } from '@/lib/data/masters-field'
+import { TOURNAMENT_FIELD } from '@/lib/data/masters-field'
 import { cookies } from 'next/headers'
 
 export async function POST(
@@ -20,7 +20,7 @@ export async function POST(
   try {
     // Use the curated Masters field as the primary source.
     // ESPN returns whatever PGA event is current, not necessarily the Masters.
-    const golfers = MASTERS_FIELD
+    const golfers = TOURNAMENT_FIELD
 
     // Insert golfers into golfer_scores as summary rows
     for (const golfer of golfers) {

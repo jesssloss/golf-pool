@@ -132,7 +132,7 @@ export default function CreatePool() {
               required
               value={formData.poolName}
               onChange={e => handlePoolNameChange(e.target.value)}
-              placeholder="e.g., The Amen Corner Invitational"
+              placeholder="e.g., The Green Jacket Invitational"
               className={inputClass}
             />
           </div>
@@ -277,7 +277,7 @@ export default function CreatePool() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Pool URL</label>
               <div className="flex items-center gap-0">
                 <span className="px-3 py-2 bg-cream border border-r-0 border-gray-300 rounded-l-sm text-sm text-muted-gray whitespace-nowrap">
-                  pimento.bet/
+                  {typeof window !== 'undefined' ? window.location.host : 'yoursite.com'}/
                 </span>
                 <input
                   type="text"

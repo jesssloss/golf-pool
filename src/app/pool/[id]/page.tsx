@@ -102,7 +102,7 @@ export default function PoolPage() {
     : ''
 
   const publicUrl = pool.slug
-    ? (typeof window !== 'undefined' ? `${window.location.origin}/p/${pool.slug}` : `pimento.bet/${pool.slug}`)
+    ? (typeof window !== 'undefined' ? `${window.location.origin}/p/${pool.slug}` : `/p/${pool.slug}`)
     : ''
 
   const isManualMode = pool.draft_mode === 'manual'

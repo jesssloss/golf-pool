@@ -13,9 +13,9 @@ import { MILESTONE_COPY } from '@/lib/constants/copy'
 import GreenJacketIcon from '@/components/GreenJacketIcon'
 import { SLASHGOLF_PLAYER_IDS } from '@/lib/data/slashgolf-ids'
 
-// Augusta National par for each hole
-const AUGUSTA_PARS = [4, 5, 4, 3, 4, 3, 4, 5, 4, 4, 4, 3, 5, 4, 5, 3, 4, 4]
-const AUGUSTA_HOLE_NAMES = [
+// Course pars and hole names — replace with your tournament course
+const COURSE_PARS = [4, 5, 4, 3, 4, 3, 4, 5, 4, 4, 4, 3, 5, 4, 5, 3, 4, 4]
+const COURSE_HOLE_NAMES = [
   'Tea Olive', 'Pink Dogwood', 'Flowering Peach', 'Flowering Crab Apple',
   'Magnolia', 'Juniper', 'Pampas', 'Yellow Jasmine', 'Carolina Cherry',
   'Camellia', 'White Dogwood', 'Golden Bell', 'Azalea', 'Chinese Fir',
@@ -39,7 +39,7 @@ function generateFakeHoleScores(roundToPar: number, thruHole: number = 18): (num
       continue
     }
     const holesLeft = thruHole - h
-    const par = AUGUSTA_PARS[h]
+    const par = COURSE_PARS[h]
 
     if (holesLeft === 1) {
       scores.push(par + remaining)
@@ -353,8 +353,8 @@ export default function TeamDetail() {
                       const back9 = holeScoresArr.slice(9, 18)
                       const front9Total = front9.filter((s): s is number => s !== null).reduce((a, b) => a + b, 0)
                       const back9Total = back9.filter((s): s is number => s !== null).reduce((a, b) => a + b, 0)
-                      const front9Par = AUGUSTA_PARS.slice(0, 9).reduce((a, b) => a + b, 0)
-                      const back9Par = AUGUSTA_PARS.slice(9, 18).reduce((a, b) => a + b, 0)
+                      const front9Par = COURSE_PARS.slice(0, 9).reduce((a, b) => a + b, 0)
+                      const back9Par = COURSE_PARS.slice(9, 18).reduce((a, b) => a + b, 0)
 
                       return (
                         <div key={roundNum} className="px-4 py-3 border-b border-muted-gray/10 last:border-b-0">
@@ -390,7 +390,7 @@ export default function TeamDetail() {
                               <tbody>
                                 <tr className="text-muted-gray/60">
                                   <td className="px-1 py-0.5 text-left">Par</td>
-                                  {AUGUSTA_PARS.slice(0, 9).map((p, i) => (
+                                  {COURSE_PARS.slice(0, 9).map((p, i) => (
                                     <td key={i} className="px-1 py-0.5 text-center">{p}</td>
                                   ))}
                                   <td className="px-1 py-0.5 text-center font-semibold">{front9Par}</td>
@@ -400,8 +400,8 @@ export default function TeamDetail() {
                                   {front9.map((score, i) => (
                                     <td key={i} className="px-0.5 py-1 text-center">
                                       {score !== null ? (
-                                        <span className={`inline-flex items-center justify-center w-6 h-6 text-xs ${holeScoreStyle(score, AUGUSTA_PARS[i])}`}>
-                                          {holeScoreLabel(score, AUGUSTA_PARS[i])}
+                                        <span className={`inline-flex items-center justify-center w-6 h-6 text-xs ${holeScoreStyle(score, COURSE_PARS[i])}`}>
+                                          {holeScoreLabel(score, COURSE_PARS[i])}
                                         </span>
                                       ) : (
                                         <span className="text-muted-gray/30">-</span>
@@ -429,7 +429,7 @@ export default function TeamDetail() {
                               <tbody>
                                 <tr className="text-muted-gray/60">
                                   <td className="px-1 py-0.5 text-left">Par</td>
-                                  {AUGUSTA_PARS.slice(9, 18).map((p, i) => (
+                                  {COURSE_PARS.slice(9, 18).map((p, i) => (
                                     <td key={i} className="px-1 py-0.5 text-center">{p}</td>
                                   ))}
                                   <td className="px-1 py-0.5 text-center font-semibold">{back9Par}</td>
@@ -439,8 +439,8 @@ export default function TeamDetail() {
                                   {back9.map((score, i) => (
                                     <td key={i} className="px-0.5 py-1 text-center">
                                       {score !== null ? (
-                                        <span className={`inline-flex items-center justify-center w-6 h-6 text-xs ${holeScoreStyle(score, AUGUSTA_PARS[i + 9])}`}>
-                                          {holeScoreLabel(score, AUGUSTA_PARS[i + 9])}
+                                        <span className={`inline-flex items-center justify-center w-6 h-6 text-xs ${holeScoreStyle(score, COURSE_PARS[i + 9])}`}>
+                                          {holeScoreLabel(score, COURSE_PARS[i + 9])}
                                         </span>
                                       ) : (
                                         <span className="text-muted-gray/30">-</span>
@@ -457,7 +457,7 @@ export default function TeamDetail() {
 
                           {/* Hole names */}
                           <div className="mt-1 text-[9px] text-muted-gray/40 italic hidden sm:block">
-                            {AUGUSTA_HOLE_NAMES.slice(0, thru).join(' \u00b7 ')}
+                            {COURSE_HOLE_NAMES.slice(0, thru).join(' \u00b7 ')}
                           </div>
                         </div>
                       )

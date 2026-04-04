@@ -1,6 +1,6 @@
 // 2025 Masters field with approximate world rankings
 // Used as fallback when ESPN API doesn't have tournament data
-export const MASTERS_FIELD: { id: string; name: string; world_ranking: number }[] = [
+export const TOURNAMENT_FIELD: { id: string; name: string; world_ranking: number }[] = [
   { id: 'scottie-scheffler', name: 'Scottie Scheffler', world_ranking: 1 },
   { id: 'xander-schauffele', name: 'Xander Schauffele', world_ranking: 2 },
   { id: 'rory-mcilroy', name: 'Rory McIlroy', world_ranking: 3 },
