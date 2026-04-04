@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
     dropDeadlineRound,
     draftTimerSeconds,
     draftMode,
+    slug,
     buyInAmount,
     paymentMethod,
     paymentDetails,
@@ -41,9 +42,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Buy-in amount must be between 0 and 10000' }, { status: 400 })
   }
 
+  // Validate slug for manual mode
+  if (draftMode === 'manual' && slug) {
+    if (!/^[a-z0-9-]{3,50}$/.test(slug)) {
+      return NextResponse.json({ error: 'URL slug must be 3-50 characters, lowercase letters, numbers, and hyphens only' }, { status: 400 })
+    }
+  }
+
   const supabase = createServerSupabaseClient()
   const sessionToken = crypto.randomUUID()
   const inviteCode = generateInviteCode()
+
+  // Check slug uniqueness if provided
+  if (slug) {
+    const { data: existingPool } = await supabase
+      .from('pools')
+      .select('id')
+      .eq('slug', slug)
+      .single()
+
+    if (existingPool) {
+      return NextResponse.json({ error: 'This URL is already taken. Try a different one.' }, { status: 400 })
+    }
+  }
 
   // Create pool
   const { data: pool, error: poolError } = await supabase
@@ -58,6 +79,7 @@ export async function POST(request: NextRequest) {
       drop_deadline_round: dropDeadlineRound,
       draft_timer_seconds: draftTimerSeconds,
       draft_mode: draftMode || 'live',
+      slug: slug || null,
       buy_in_amount: buyInAmount,
       payment_method: paymentMethod || 'cash',
       payment_details: paymentDetails || null,
@@ -86,18 +108,21 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Create commissioner's team
-  const { error: teamError } = await supabase
-    .from('teams')
-    .insert({
-      pool_id: pool.id,
-      owner_name: commissionerName,
-      session_token: sessionToken,
-      is_commissioner: true,
-    })
+  // For manual mode, don't create a team for the commissioner.
+  // They'll add players (possibly including themselves) via the add player API.
+  if (draftMode !== 'manual') {
+    const { error: teamError } = await supabase
+      .from('teams')
+      .insert({
+        pool_id: pool.id,
+        owner_name: commissionerName,
+        session_token: sessionToken,
+        is_commissioner: true,
+      })
 
-  if (teamError) {
-    return NextResponse.json({ error: teamError.message }, { status: 500 })
+    if (teamError) {
+      return NextResponse.json({ error: teamError.message }, { status: 500 })
+    }
   }
 
   // Set session cookie scoped to this pool

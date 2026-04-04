@@ -11,6 +11,7 @@ export interface Pool {
   drop_deadline_round: number
   draft_timer_seconds: number
   draft_mode: 'live' | 'manual'
+  slug?: string
   buy_in_amount: number
   payment_method: 'e-transfer' | 'paypal' | 'cash' | 'other'
   payment_details: string | null

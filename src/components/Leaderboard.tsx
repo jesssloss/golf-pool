@@ -17,6 +17,7 @@ import type { Payment } from '@/types'
 interface Props {
   poolId: string
   pool: Pool
+  readOnly?: boolean
 }
 
 interface TeamStanding {
@@ -26,7 +27,7 @@ interface TeamStanding {
   rank: number
 }
 
-export default function Leaderboard({ poolId, pool }: Props) {
+export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
   const supabase = useMemo(() => createClient(), [])
   const [standings, setStandings] = useState<TeamStanding[]>([])
   const [loading, setLoading] = useState(true)
@@ -135,8 +136,9 @@ export default function Leaderboard({ poolId, pool }: Props) {
   }
 
 
-  // Load current team
+  // Load current team (skip for public read-only views)
   useEffect(() => {
+    if (readOnly) return
     async function loadMe() {
       const res = await fetch(`/api/pools/${poolId}/me`)
       if (res.ok) {
@@ -145,7 +147,7 @@ export default function Leaderboard({ poolId, pool }: Props) {
       }
     }
     loadMe()
-  }, [poolId])
+  }, [poolId, readOnly])
 
   // Realtime subscription for instant updates when cron writes scores
   useEffect(() => {
@@ -256,13 +258,15 @@ export default function Leaderboard({ poolId, pool }: Props) {
             >
               {copied ? 'Copied!' : 'Share'}
             </button>
-            <button
-              onClick={handleManualRefresh}
-              disabled={refreshing}
-              className="text-sm px-3 py-2 min-h-[44px] border border-pimento text-pimento rounded-sm hover:bg-pimento hover:text-white transition-colors disabled:opacity-50"
-            >
-              {refreshing ? '...' : 'Refresh'}
-            </button>
+            {!readOnly && (
+              <button
+                onClick={handleManualRefresh}
+                disabled={refreshing}
+                className="text-sm px-3 py-2 min-h-[44px] border border-pimento text-pimento rounded-sm hover:bg-pimento hover:text-white transition-colors disabled:opacity-50"
+              >
+                {refreshing ? '...' : 'Refresh'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -473,8 +477,8 @@ export default function Leaderboard({ poolId, pool }: Props) {
           )
         })()}
 
-        {/* Payout Summary — Commissioner only */}
-        {isComplete && currentTeam?.is_commissioner && (() => {
+        {/* Payout Summary — Commissioner only, hidden in readOnly */}
+        {!readOnly && isComplete && currentTeam?.is_commissioner && (() => {
           const prizePool = pool.buy_in_amount * standings.length
           const payouts = calculatePayouts(
             standings.map(s => ({ team_id: s.team.id, team_name: s.team.owner_name, total: s.teamTotal, rank: s.rank })),

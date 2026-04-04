@@ -8,11 +8,22 @@ interface PayoutRule {
   percentage: number
 }
 
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 50)
+}
+
 export default function CreatePool() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [slugEdited, setSlugEdited] = useState(false)
   const [formData, setFormData] = useState({
     poolName: '',
     commissionerName: '',
@@ -22,6 +33,7 @@ export default function CreatePool() {
     dropDeadlineRound: 2,
     draftTimerSeconds: 90,
     draftMode: 'live' as 'live' | 'manual',
+    slug: '',
     buyInAmount: 50,
     paymentMethod: 'cash' as 'e-transfer' | 'paypal' | 'cash' | 'other',
     paymentDetails: '',
@@ -51,10 +63,36 @@ export default function CreatePool() {
     setPayoutRules(updated)
   }
 
+  function handlePoolNameChange(name: string) {
+    const updates: Partial<typeof formData> = { poolName: name }
+    if (!slugEdited && formData.draftMode === 'manual') {
+      updates.slug = generateSlug(name)
+    }
+    setFormData(prev => ({ ...prev, ...updates }))
+  }
+
+  function handleSlugChange(slug: string) {
+    const cleaned = slug.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 50)
+    setSlugEdited(true)
+    setFormData(prev => ({ ...prev, slug: cleaned }))
+  }
+
+  function handleDraftModeChange(mode: 'live' | 'manual') {
+    const updates: Partial<typeof formData> = { draftMode: mode }
+    if (mode === 'manual' && !formData.slug) {
+      updates.slug = generateSlug(formData.poolName)
+    }
+    setFormData(prev => ({ ...prev, ...updates }))
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (totalPercentage !== 100) {
       setError('Payout percentages must sum to 100%')
+      return
+    }
+    if (formData.draftMode === 'manual' && formData.slug && formData.slug.length < 3) {
+      setError('Pool URL must be at least 3 characters')
       return
     }
     setError('')
@@ -93,7 +131,7 @@ export default function CreatePool() {
               type="text"
               required
               value={formData.poolName}
-              onChange={e => setFormData({ ...formData, poolName: e.target.value })}
+              onChange={e => handlePoolNameChange(e.target.value)}
               placeholder="e.g., The Amen Corner Invitational"
               className={inputClass}
             />
@@ -205,7 +243,7 @@ export default function CreatePool() {
             <div className="flex gap-0 rounded-sm overflow-hidden border border-muted-gray/30">
               <button
                 type="button"
-                onClick={() => setFormData({ ...formData, draftMode: 'live' })}
+                onClick={() => handleDraftModeChange('live')}
                 className={`flex-1 py-2.5 px-4 text-sm font-semibold transition-colors min-h-[44px] ${
                   formData.draftMode === 'live'
                     ? 'bg-pimento text-white'
@@ -216,7 +254,7 @@ export default function CreatePool() {
               </button>
               <button
                 type="button"
-                onClick={() => setFormData({ ...formData, draftMode: 'manual' })}
+                onClick={() => handleDraftModeChange('manual')}
                 className={`flex-1 py-2.5 px-4 text-sm font-semibold transition-colors min-h-[44px] ${
                   formData.draftMode === 'manual'
                     ? 'bg-pimento text-white'
@@ -232,6 +270,28 @@ export default function CreatePool() {
                 : 'Commissioner enters all picks (collect picks via text, email, etc.)'}
             </p>
           </div>
+
+          {/* Pool URL Slug - Manual mode only */}
+          {formData.draftMode === 'manual' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Pool URL</label>
+              <div className="flex items-center gap-0">
+                <span className="px-3 py-2 bg-cream border border-r-0 border-gray-300 rounded-l-sm text-sm text-muted-gray whitespace-nowrap">
+                  pimento.bet/
+                </span>
+                <input
+                  type="text"
+                  value={formData.slug}
+                  onChange={e => handleSlugChange(e.target.value)}
+                  placeholder="my-pool"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-r-sm focus:ring-2 focus:ring-pimento focus:border-transparent"
+                />
+              </div>
+              <p className="text-xs text-muted-gray mt-1">
+                Share this link with players so they can view the leaderboard. Lowercase letters, numbers, and hyphens only.
+              </p>
+            </div>
+          )}
 
           {/* Advanced Settings */}
           <div>

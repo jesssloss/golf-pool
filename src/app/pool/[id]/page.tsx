@@ -21,10 +21,13 @@ export default function PoolPage() {
   const [currentTeam, setCurrentTeam] = useState<Team | null>(null)
   const [isCommissioner, setIsCommissioner] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [newPlayerName, setNewPlayerName] = useState('')
+  const [addingPlayer, setAddingPlayer] = useState(false)
+  const [addPlayerError, setAddPlayerError] = useState('')
 
   const loadData = useCallback(async () => {
     const [poolRes, teamsRes, rulesRes] = await Promise.all([
-      supabase.from('pools').select('id, name, tournament_name, invite_code, status, players_per_team, scoring_players, missed_cut_score, drop_deadline_round, draft_timer_seconds, draft_mode, buy_in_amount, payment_method, payment_details, created_at').eq('id', poolId).single(),
+      supabase.from('pools').select('id, name, tournament_name, invite_code, status, players_per_team, scoring_players, missed_cut_score, drop_deadline_round, draft_timer_seconds, draft_mode, slug, buy_in_amount, payment_method, payment_details, created_at').eq('id', poolId).single(),
       supabase.from('teams').select('id, pool_id, owner_name, draft_position, is_commissioner, buy_in_paid, created_at').eq('pool_id', poolId).order('draft_position'),
       supabase.from('payout_rules').select('*').eq('pool_id', poolId).order('position'),
     ])
@@ -98,6 +101,12 @@ export default function PoolPage() {
     ? `${window.location.origin}/join/${pool.invite_code}`
     : ''
 
+  const publicUrl = pool.slug
+    ? (typeof window !== 'undefined' ? `${window.location.origin}/p/${pool.slug}` : `pimento.bet/${pool.slug}`)
+    : ''
+
+  const isManualMode = pool.draft_mode === 'manual'
+
   async function randomizeDraftOrder() {
     const res = await fetch(`/api/pools/${poolId}/draft-order`, {
       method: 'POST',
@@ -124,6 +133,42 @@ export default function PoolPage() {
       body: JSON.stringify({ paid: !currentPaid }),
     })
     loadData()
+  }
+
+  async function addPlayer() {
+    if (!newPlayerName.trim()) return
+    setAddingPlayer(true)
+    setAddPlayerError('')
+    try {
+      const res = await fetch(`/api/pools/${poolId}/teams`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerName: newPlayerName.trim() }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        setAddPlayerError(data.error || 'Failed to add player')
+      } else {
+        setNewPlayerName('')
+        loadData()
+      }
+    } catch {
+      setAddPlayerError('Failed to add player. Check your connection.')
+    }
+    setAddingPlayer(false)
+  }
+
+  async function removePlayer(teamId: string) {
+    try {
+      const res = await fetch(`/api/pools/${poolId}/teams`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId }),
+      })
+      if (res.ok) loadData()
+    } catch {
+      // silently fail
+    }
   }
 
   const paidCount = teams.filter(t => t.buy_in_paid).length
@@ -195,37 +240,85 @@ export default function PoolPage() {
 
           <MilestoneBanner text={MILESTONE_COPY.poolCreated} />
 
-          {/* Invite link — commissioner only */}
-          <div className="bg-white rounded-sm p-4 mb-6 border border-muted-gray/20 mt-4">
-            <div className="text-sm text-muted-gray mb-1">Share this link to invite players</div>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 bg-cream px-3 py-2 rounded-sm text-sm font-mono break-all">
-                {inviteUrl}
-              </code>
-              <button
-                onClick={() => navigator.clipboard.writeText(inviteUrl)}
-                className="px-3 py-2 min-h-[44px] bg-pimento text-white text-sm rounded-sm hover:bg-pimento-dark transition-colors whitespace-nowrap"
-              >
-                Copy
-              </button>
+          {/* Manual mode: show public URL */}
+          {isManualMode && publicUrl ? (
+            <div className="bg-white rounded-sm p-4 mb-6 border border-muted-gray/20 mt-4">
+              <div className="text-sm text-muted-gray mb-1">Player tracking link</div>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-cream px-3 py-2 rounded-sm text-sm font-mono break-all">
+                  {publicUrl}
+                </code>
+                <button
+                  onClick={() => navigator.clipboard.writeText(publicUrl)}
+                  className="px-3 py-2 min-h-[44px] bg-pimento text-white text-sm rounded-sm hover:bg-pimento-dark transition-colors whitespace-nowrap"
+                >
+                  Copy
+                </button>
+              </div>
+              <p className="text-xs text-muted-gray mt-2">
+                Share this link with players. The leaderboard will go live once you finalize the draft.
+              </p>
             </div>
-          </div>
+          ) : !isManualMode ? (
+            /* Live mode: show invite link */
+            <div className="bg-white rounded-sm p-4 mb-6 border border-muted-gray/20 mt-4">
+              <div className="text-sm text-muted-gray mb-1">Share this link to invite players</div>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-cream px-3 py-2 rounded-sm text-sm font-mono break-all">
+                  {inviteUrl}
+                </code>
+                <button
+                  onClick={() => navigator.clipboard.writeText(inviteUrl)}
+                  className="px-3 py-2 min-h-[44px] bg-pimento text-white text-sm rounded-sm hover:bg-pimento-dark transition-colors whitespace-nowrap"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {poolConfigCard}
 
-          {/* Players list with paid toggles */}
+          {/* Players list */}
           <div className="bg-white rounded-sm border border-muted-gray/20 overflow-hidden mb-6">
             <div className="px-4 py-3 border-b border-muted-gray/20 bg-cream flex items-center justify-between">
               <h2 className="font-serif font-semibold text-gray-700">
                 Players ({teams.length})
               </h2>
               <div className="text-xs text-muted-gray">
-                <span className={paidCount === teams.length ? 'text-score-green font-semibold' : ''}>
+                <span className={paidCount === teams.length && teams.length > 0 ? 'text-score-green font-semibold' : ''}>
                   ${totalCollected}
                 </span>
                 {' / $'}{totalExpected} collected
               </div>
             </div>
+
+            {/* Add Player input - manual mode only */}
+            {isManualMode && (
+              <div className="px-4 py-3 border-b border-muted-gray/20">
+                {addPlayerError && (
+                  <div className="text-score-red text-xs mb-2">{addPlayerError}</div>
+                )}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newPlayerName}
+                    onChange={e => setNewPlayerName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addPlayer() } }}
+                    placeholder="Enter player name..."
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-pimento focus:border-transparent"
+                  />
+                  <button
+                    onClick={addPlayer}
+                    disabled={addingPlayer || !newPlayerName.trim()}
+                    className="px-4 py-2 min-h-[44px] bg-pimento text-white text-sm rounded-sm hover:bg-pimento-dark transition-colors disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {addingPlayer ? 'Adding...' : 'Add Player'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {teams.length === 0 && (
               <div className="px-4 py-8 text-center">
                 <GreenJacketIcon size={24} />
@@ -246,16 +339,27 @@ export default function PoolPage() {
                       )}
                     </span>
                   </div>
-                  <button
-                    onClick={() => togglePaid(team.id, team.buy_in_paid)}
-                    className={`text-xs px-3 py-2 min-h-[44px] rounded-sm ${
-                      team.buy_in_paid
-                        ? 'bg-score-green/10 text-score-green'
-                        : 'bg-gray-100 text-muted-gray'
-                    }`}
-                  >
-                    {team.buy_in_paid ? 'Paid' : 'Unpaid'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => togglePaid(team.id, team.buy_in_paid)}
+                      className={`text-xs px-3 py-2 min-h-[44px] rounded-sm ${
+                        team.buy_in_paid
+                          ? 'bg-score-green/10 text-score-green'
+                          : 'bg-gray-100 text-muted-gray'
+                      }`}
+                    >
+                      {team.buy_in_paid ? 'Paid' : 'Unpaid'}
+                    </button>
+                    {isManualMode && (
+                      <button
+                        onClick={() => removePlayer(team.id)}
+                        className="text-score-red text-sm hover:text-red-700 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                        title="Remove player"
+                      >
+                        &#10005;
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -263,13 +367,15 @@ export default function PoolPage() {
 
           {/* Commissioner controls */}
           <div className="space-y-3">
-            <button
-              onClick={randomizeDraftOrder}
-              className="w-full py-3 px-6 border-2 border-pimento text-pimento rounded-sm font-semibold hover:bg-pimento hover:text-white transition-colors"
-            >
-              Randomize Draft Order
-            </button>
-            {pool.draft_mode === 'manual' ? (
+            {!isManualMode && (
+              <button
+                onClick={randomizeDraftOrder}
+                className="w-full py-3 px-6 border-2 border-pimento text-pimento rounded-sm font-semibold hover:bg-pimento hover:text-white transition-colors"
+              >
+                Randomize Draft Order
+              </button>
+            )}
+            {isManualMode ? (
               <button
                 onClick={enterPicks}
                 disabled={teams.length < 2}
@@ -384,7 +490,7 @@ export default function PoolPage() {
 
         {poolConfigCard}
 
-        {/* Player roster — read-only */}
+        {/* Player roster -- read-only */}
         <div className="bg-white rounded-sm border border-muted-gray/20 overflow-hidden mb-6">
           <div className="px-4 py-3 border-b border-muted-gray/20 bg-cream">
             <h2 className="font-serif font-semibold text-gray-700">

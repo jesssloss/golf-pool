@@ -10,23 +10,12 @@ export async function GET(
   const sessionToken = cookieStore.get(`session_token_${params.id}`)?.value
 
   if (!sessionToken) {
-    return NextResponse.json({ team: null })
+    return NextResponse.json({ team: null, isCommissioner: false })
   }
 
   const supabase = createServerSupabaseClient()
 
-  const { data: team } = await supabase
-    .from('teams')
-    .select('*')
-    .eq('pool_id', params.id)
-    .eq('session_token', sessionToken)
-    .single()
-
-  if (!team) {
-    return NextResponse.json({ team: null, isCommissioner: false })
-  }
-
-  // Check commissioner status server-side by comparing tokens
+  // First check if this token is the commissioner token
   const { data: pool } = await supabase
     .from('pools')
     .select('commissioner_token')
@@ -35,5 +24,22 @@ export async function GET(
 
   const isCommissioner = !!(pool && pool.commissioner_token === sessionToken)
 
-  return NextResponse.json({ team, isCommissioner })
+  // Then check if this token matches any team
+  const { data: team } = await supabase
+    .from('teams')
+    .select('*')
+    .eq('pool_id', params.id)
+    .eq('session_token', sessionToken)
+    .single()
+
+  if (team) {
+    return NextResponse.json({ team, isCommissioner })
+  }
+
+  // Commissioner without a team (manual mode where commissioner hasn't added themselves)
+  if (isCommissioner) {
+    return NextResponse.json({ team: null, isCommissioner: true })
+  }
+
+  return NextResponse.json({ team: null, isCommissioner: false })
 }
