@@ -28,6 +28,12 @@ interface TeamStanding {
 }
 
 export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
+  // Build team detail URL based on context (public slug vs private pool)
+  const teamUrl = (teamId: string) =>
+    readOnly && pool.slug
+      ? `/p/${pool.slug}/team/${teamId}`
+      : `/pool/${poolId}/team/${teamId}`
+
   const supabase = useMemo(() => createClient(), [])
   const [standings, setStandings] = useState<TeamStanding[]>([])
   const [loading, setLoading] = useState(true)
@@ -305,7 +311,7 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
 
         {/* Your Position Card */}
         {myStanding && (
-          <Link href={`/pool/${poolId}/team/${myStanding.team.id}`}>
+          <Link href={teamUrl(myStanding.team.id)}>
             <div className="bg-white rounded-sm p-4 mb-4 border border-pimento/30 flex items-center justify-between hover:bg-cream transition-colors">
               <div>
                 <div className="text-xs text-muted-gray">Your Team</div>
@@ -353,7 +359,7 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
             const payout = getPayoutAmount(s.rank)
 
             return (
-              <Link key={s.team.id} href={`/pool/${poolId}/team/${s.team.id}`}>
+              <Link key={s.team.id} href={teamUrl(s.team.id)}>
                 <div className={`rounded-sm p-3 border ${
                   isWinner ? 'bg-cheddar/10 border-cheddar/40' :
                   isMe ? 'bg-pimento/5 border-pimento/30' :
@@ -444,7 +450,7 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <Link href={`/pool/${poolId}/team/${s.team.id}`} className="hover:underline">
+                      <Link href={teamUrl(s.team.id)} className="hover:underline">
                         <span className="font-serif font-semibold">
                           {isWinner && <GreenJacketIcon size={16} />}
                           {' '}{s.team.owner_name}
