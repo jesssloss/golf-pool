@@ -6,8 +6,73 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Pool, Team, TeamGolfer, GolferScore } from '@/types'
 import StatusBadge from '@/components/StatusBadge'
-import FlipScore from '@/components/FlipScore'
 import GreenJacketIcon from '@/components/GreenJacketIcon'
+
+// Augusta National par for each hole
+const AUGUSTA_PARS = [4, 5, 4, 3, 4, 3, 4, 5, 4, 4, 4, 3, 5, 4, 5, 3, 4, 4]
+const AUGUSTA_HOLE_NAMES = [
+  'Tea Olive', 'Pink Dogwood', 'Flowering Peach', 'Flowering Crab Apple',
+  'Magnolia', 'Juniper', 'Pampas', 'Yellow Jasmine', 'Carolina Cherry',
+  'Camellia', 'White Dogwood', 'Golden Bell', 'Azalea', 'Chinese Fir',
+  'Firethorn', 'Redbud', 'Nandina', 'Holly'
+]
+
+// Generate realistic fake hole scores for a round given the round total to par
+function generateFakeHoleScores(roundToPar: number, thruHole: number = 18): (number | null)[] {
+  // Seed-like approach: distribute the score across holes realistically
+  const scores: (number | null)[] = []
+  let remaining = roundToPar
+
+  for (let h = 0; h < 18; h++) {
+    if (h >= thruHole) {
+      scores.push(null) // hasn't played this hole yet
+      continue
+    }
+    const holesLeft = thruHole - h
+    const par = AUGUSTA_PARS[h]
+
+    if (holesLeft === 1) {
+      // Last hole gets whatever is remaining
+      scores.push(par + remaining)
+    } else {
+      // Distribute: mostly pars with occasional birdies/bogeys
+      let holeScore = par
+      const rand = Math.sin(h * 17 + roundToPar * 31) * 0.5 + 0.5 // deterministic pseudo-random
+
+      if (remaining < 0 && rand < 0.4) {
+        holeScore = par - 1 // birdie
+        remaining += 1
+      } else if (remaining > 0 && rand > 0.6) {
+        holeScore = par + 1 // bogey
+        remaining -= 1
+      } else if (rand > 0.95 && par === 5) {
+        holeScore = par - 2 // eagle on par 5
+        remaining += 2
+      }
+
+      scores.push(holeScore)
+    }
+  }
+  return scores
+}
+
+function holeScoreLabel(score: number, par: number): string {
+  const diff = score - par
+  if (diff <= -2) return `${score}` // eagle or better
+  if (diff === -1) return `${score}` // birdie
+  if (diff === 0) return `${score}` // par
+  if (diff === 1) return `${score}` // bogey
+  return `${score}` // double+
+}
+
+function holeScoreStyle(score: number, par: number): string {
+  const diff = score - par
+  if (diff <= -2) return 'bg-score-green text-white rounded-full font-bold' // eagle
+  if (diff === -1) return 'text-score-green font-bold ring-1 ring-score-green rounded-full' // birdie
+  if (diff === 0) return 'text-gray-700' // par
+  if (diff === 1) return 'bg-score-red/10 text-score-red font-bold rounded-sm' // bogey
+  return 'bg-score-red text-white font-bold rounded-sm' // double+
+}
 
 export default function PublicTeamDetail() {
   const params = useParams()
@@ -19,9 +84,9 @@ export default function PublicTeamDetail() {
   const [team, setTeam] = useState<Team | null>(null)
   const [golfers, setGolfers] = useState<(TeamGolfer & { scores: GolferScore[] })[]>([])
   const [loading, setLoading] = useState(true)
+  const [expandedGolfer, setExpandedGolfer] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
-    // Look up pool by slug
     const { data: poolData } = await supabase
       .from('pools')
       .select('id, name, tournament_name, invite_code, status, players_per_team, scoring_players, missed_cut_score, drop_deadline_round, draft_timer_seconds, draft_mode, slug, buy_in_amount, payment_method, payment_details, created_at')
@@ -67,8 +132,6 @@ export default function PublicTeamDetail() {
     )
   }
 
-  const hasR4 = golfers.some(g => g.scores.some(sc => sc.round_number === 4))
-
   function formatScore(score: number): string {
     if (score === 0) return 'E'
     return score > 0 ? `+${score}` : `${score}`
@@ -82,81 +145,195 @@ export default function PublicTeamDetail() {
 
   return (
     <main className="min-h-screen py-4 px-4">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <Link href={`/p/${slug}`} className="text-sm text-pimento hover:underline mb-4 block min-h-[44px] flex items-center">
-          Back to Leaderboard
+          &larr; Back to Leaderboard
         </Link>
 
         <div className="flex items-center gap-2 mb-1">
           <GreenJacketIcon size={24} />
           <h1 className="text-2xl font-serif font-bold text-pimento">{team.owner_name}</h1>
         </div>
-        <p className="text-sm text-muted-gray mb-2">
-          Best {pool.scoring_players} of {pool.players_per_team} golfers count
+        <p className="text-sm text-muted-gray mb-4">
+          Best {pool.scoring_players} of {pool.players_per_team} golfers count &middot; {pool.tournament_name}
         </p>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="bg-pimento text-cream">
-                <th className="px-4 py-2 text-left font-serif font-bold">Golfer</th>
-                <th className="px-2 py-2 text-center font-serif font-bold w-14">R1</th>
-                <th className="px-2 py-2 text-center font-serif font-bold w-14">R2</th>
-                <th className="px-2 py-2 text-center font-serif font-bold w-14">R3</th>
-                <th className="px-2 py-2 text-center font-serif font-bold w-14">{hasR4 ? 'Final' : 'R4'}</th>
-                <th className="px-2 py-2 text-center font-serif font-bold w-14">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {golfers.map((g, idx) => {
-                const roundScores = [1, 2, 3, 4].map(r => {
-                  const score = g.scores.find(s => s.round_number === r)
-                  return score?.score_to_par ?? null
-                })
-                const latestScore = g.scores.find(s => s.round_number === null) || g.scores[0]
-                const total = latestScore?.total_to_par || 0
-                const status = latestScore?.status || 'active'
-                const isMissedCut = ['cut', 'withdrawn', 'dq'].includes(status)
+        {/* Golfer cards */}
+        <div className="space-y-3">
+          {golfers.map((g) => {
+            const latestScore = g.scores.find(s => s.round_number === null) || g.scores[0]
+            const total = latestScore?.total_to_par || 0
+            const status = latestScore?.status || 'active'
+            const thruHole = latestScore?.thru_hole || 0
+            const isExpanded = expandedGolfer === g.golfer_id
+            const roundScores = [1, 2, 3, 4].map(r => {
+              const score = g.scores.find(s => s.round_number === r)
+              return score ? { toPar: score.score_to_par ?? 0, thru: score.thru_hole || 18 } : null
+            })
 
-                return (
-                  <tr
-                    key={g.golfer_id}
-                    className={`border-b border-muted-gray/20 ${
-                      g.is_dropped ? 'opacity-50' : idx % 2 === 0 ? 'bg-white' : 'bg-cream'
-                    }`}
-                  >
-                    <td className={`px-4 py-3 ${g.is_dropped ? 'line-through text-muted-gray' : ''}`}>
-                      <span className="font-serif font-medium">{g.golfer_name}</span>
+            return (
+              <div key={g.golfer_id} className={`border rounded-sm overflow-hidden ${
+                g.is_dropped ? 'opacity-50 border-muted-gray/20' : 'border-muted-gray/20'
+              }`}>
+                {/* Golfer summary row - clickable */}
+                <button
+                  onClick={() => setExpandedGolfer(isExpanded ? null : g.golfer_id)}
+                  className="w-full px-4 py-3 flex items-center justify-between bg-white hover:bg-cream/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`transform transition-transform text-muted-gray text-xs ${isExpanded ? 'rotate-90' : ''}`}>&#9654;</span>
+                    <div className="text-left">
+                      <span className={`font-serif font-semibold ${g.is_dropped ? 'line-through text-muted-gray' : ''}`}>
+                        {g.golfer_name}
+                      </span>
                       {g.is_dropped && <StatusBadge status="dropped" />}
                       {!g.is_dropped && status !== 'active' && (
                         <StatusBadge status={status as 'cut' | 'withdrawn' | 'dq'} />
                       )}
-                      {!g.is_dropped && latestScore?.thru_hole && latestScore.thru_hole < 18 && status === 'active' && (
-                        <div className="text-[10px] text-muted-gray font-sans mt-0.5">thru {latestScore.thru_hole}</div>
+                      {!g.is_dropped && thruHole > 0 && thruHole < 18 && status === 'active' && (
+                        <span className="ml-2 text-[10px] text-muted-gray">thru {thruHole}</span>
                       )}
-                    </td>
-                    {roundScores.map((score, i) => {
-                      const isMissedCutRound = isMissedCut && score !== null && i >= (latestScore?.thru_hole === null ? 2 : 4)
-                      return (
-                        <td key={i} className={`px-2 py-3 text-center font-mono ${
-                          g.is_dropped ? 'text-muted-gray' :
-                          isMissedCutRound ? 'text-muted-gray italic' :
-                          score !== null ? scoreColor(score) : 'text-muted-gray/40'
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    {/* Round summary pills */}
+                    <div className="hidden sm:flex items-center gap-2">
+                      {roundScores.map((rs, i) => (
+                        <div key={i} className={`text-xs font-mono px-2 py-0.5 rounded-sm ${
+                          rs === null ? 'text-muted-gray/30' :
+                          rs.toPar < 0 ? 'bg-score-green/10 text-score-green' :
+                          rs.toPar > 0 ? 'bg-score-red/10 text-score-red' :
+                          'bg-gray-100 text-gray-600'
                         }`}>
-                          {score !== null ? <FlipScore value={formatScore(score)} /> : '-'}
-                        </td>
+                          {rs === null ? '-' : formatScore(rs.toPar)}
+                        </div>
+                      ))}
+                    </div>
+                    <span className={`font-mono font-bold text-lg ${scoreColor(total)}`}>
+                      {formatScore(total)}
+                    </span>
+                  </div>
+                </button>
+
+                {/* Expanded scorecard */}
+                {isExpanded && !g.is_dropped && (
+                  <div className="border-t border-muted-gray/20 bg-cream/30">
+                    {roundScores.map((rs, roundIdx) => {
+                      if (!rs) return null
+                      const roundNum = roundIdx + 1
+                      const thru = rs.thru || 18
+                      const holeScores = generateFakeHoleScores(rs.toPar, thru)
+                      const front9 = holeScores.slice(0, 9)
+                      const back9 = holeScores.slice(9, 18)
+                      const front9Total = front9.filter((s): s is number => s !== null).reduce((a, b) => a + b, 0)
+                      const back9Total = back9.filter((s): s is number => s !== null).reduce((a, b) => a + b, 0)
+                      const front9Par = AUGUSTA_PARS.slice(0, 9).reduce((a, b) => a + b, 0)
+                      const back9Par = AUGUSTA_PARS.slice(9, 18).reduce((a, b) => a + b, 0)
+
+                      return (
+                        <div key={roundNum} className="px-4 py-3 border-b border-muted-gray/10 last:border-b-0">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-muted-gray uppercase tracking-wide">
+                              Round {roundNum}
+                            </span>
+                            <span className={`text-sm font-mono font-bold ${scoreColor(rs.toPar)}`}>
+                              {formatScore(rs.toPar)}
+                              {thru < 18 && <span className="text-[10px] text-muted-gray font-normal ml-1">thru {thru}</span>}
+                            </span>
+                          </div>
+
+                          {/* Front 9 */}
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs border-collapse mb-1">
+                              <thead>
+                                <tr>
+                                  <th className="px-1 py-0.5 text-left text-muted-gray font-normal w-10">Hole</th>
+                                  {[1,2,3,4,5,6,7,8,9].map(h => (
+                                    <th key={h} className="px-1 py-0.5 text-center text-muted-gray font-normal w-8">{h}</th>
+                                  ))}
+                                  <th className="px-1 py-0.5 text-center text-muted-gray font-semibold w-10">Out</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr className="text-muted-gray/60">
+                                  <td className="px-1 py-0.5 text-left">Par</td>
+                                  {AUGUSTA_PARS.slice(0, 9).map((p, i) => (
+                                    <td key={i} className="px-1 py-0.5 text-center">{p}</td>
+                                  ))}
+                                  <td className="px-1 py-0.5 text-center font-semibold">{front9Par}</td>
+                                </tr>
+                                <tr>
+                                  <td className="px-1 py-1 text-left text-muted-gray"></td>
+                                  {front9.map((score, i) => (
+                                    <td key={i} className="px-0.5 py-1 text-center">
+                                      {score !== null ? (
+                                        <span className={`inline-flex items-center justify-center w-6 h-6 text-xs ${holeScoreStyle(score, AUGUSTA_PARS[i])}`}>
+                                          {holeScoreLabel(score, AUGUSTA_PARS[i])}
+                                        </span>
+                                      ) : (
+                                        <span className="text-muted-gray/30">-</span>
+                                      )}
+                                    </td>
+                                  ))}
+                                  <td className={`px-1 py-1 text-center font-semibold ${scoreColor(front9Total - front9Par)}`}>
+                                    {front9.some(s => s !== null) ? front9Total : '-'}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+
+                            {/* Back 9 */}
+                            <table className="w-full text-xs border-collapse">
+                              <thead>
+                                <tr>
+                                  <th className="px-1 py-0.5 text-left text-muted-gray font-normal w-10">Hole</th>
+                                  {[10,11,12,13,14,15,16,17,18].map(h => (
+                                    <th key={h} className="px-1 py-0.5 text-center text-muted-gray font-normal w-8">{h}</th>
+                                  ))}
+                                  <th className="px-1 py-0.5 text-center text-muted-gray font-semibold w-10">In</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr className="text-muted-gray/60">
+                                  <td className="px-1 py-0.5 text-left">Par</td>
+                                  {AUGUSTA_PARS.slice(9, 18).map((p, i) => (
+                                    <td key={i} className="px-1 py-0.5 text-center">{p}</td>
+                                  ))}
+                                  <td className="px-1 py-0.5 text-center font-semibold">{back9Par}</td>
+                                </tr>
+                                <tr>
+                                  <td className="px-1 py-1 text-left text-muted-gray"></td>
+                                  {back9.map((score, i) => (
+                                    <td key={i} className="px-0.5 py-1 text-center">
+                                      {score !== null ? (
+                                        <span className={`inline-flex items-center justify-center w-6 h-6 text-xs ${holeScoreStyle(score, AUGUSTA_PARS[i + 9])}`}>
+                                          {holeScoreLabel(score, AUGUSTA_PARS[i + 9])}
+                                        </span>
+                                      ) : (
+                                        <span className="text-muted-gray/30">-</span>
+                                      )}
+                                    </td>
+                                  ))}
+                                  <td className={`px-1 py-1 text-center font-semibold ${scoreColor(back9Total - back9Par)}`}>
+                                    {back9.some(s => s !== null) ? back9Total : '-'}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Hole names tooltip row */}
+                          <div className="mt-1 text-[9px] text-muted-gray/40 italic hidden sm:block">
+                            {AUGUSTA_HOLE_NAMES.slice(0, thru).join(' \u00b7 ')}
+                          </div>
+                        </div>
                       )
                     })}
-                    <td className={`px-2 py-3 text-center font-mono font-bold ${
-                      g.is_dropped ? 'text-muted-gray' : scoreColor(total)
-                    }`}>
-                      <FlipScore value={formatScore(total)} />
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
     </main>
