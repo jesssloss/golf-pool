@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Pool, Team, TeamGolfer, GolferScore } from '@/types'
 import StatusBadge from '@/components/StatusBadge'
 import GreenJacketIcon from '@/components/GreenJacketIcon'
+import { SLASHGOLF_PLAYER_IDS } from '@/lib/data/slashgolf-ids'
 
 // Augusta National par for each hole
 const AUGUSTA_PARS = [4, 5, 4, 3, 4, 3, 4, 5, 4, 4, 4, 3, 5, 4, 5, 3, 4, 4]
@@ -17,36 +18,40 @@ const AUGUSTA_HOLE_NAMES = [
   'Firethorn', 'Redbud', 'Nandina', 'Holly'
 ]
 
+interface CachedHoleScore {
+  round_number: number
+  hole_number: number
+  par: number
+  score: number
+}
+
 // Generate realistic fake hole scores for a round given the round total to par
 function generateFakeHoleScores(roundToPar: number, thruHole: number = 18): (number | null)[] {
-  // Seed-like approach: distribute the score across holes realistically
   const scores: (number | null)[] = []
   let remaining = roundToPar
 
   for (let h = 0; h < 18; h++) {
     if (h >= thruHole) {
-      scores.push(null) // hasn't played this hole yet
+      scores.push(null)
       continue
     }
     const holesLeft = thruHole - h
     const par = AUGUSTA_PARS[h]
 
     if (holesLeft === 1) {
-      // Last hole gets whatever is remaining
       scores.push(par + remaining)
     } else {
-      // Distribute: mostly pars with occasional birdies/bogeys
       let holeScore = par
-      const rand = Math.sin(h * 17 + roundToPar * 31) * 0.5 + 0.5 // deterministic pseudo-random
+      const rand = Math.sin(h * 17 + roundToPar * 31) * 0.5 + 0.5
 
       if (remaining < 0 && rand < 0.4) {
-        holeScore = par - 1 // birdie
+        holeScore = par - 1
         remaining += 1
       } else if (remaining > 0 && rand > 0.6) {
-        holeScore = par + 1 // bogey
+        holeScore = par + 1
         remaining -= 1
       } else if (rand > 0.95 && par === 5) {
-        holeScore = par - 2 // eagle on par 5
+        holeScore = par - 2
         remaining += 2
       }
 
@@ -56,13 +61,9 @@ function generateFakeHoleScores(roundToPar: number, thruHole: number = 18): (num
   return scores
 }
 
-function holeScoreLabel(score: number, par: number): string {
-  const diff = score - par
-  if (diff <= -2) return `${score}` // eagle or better
-  if (diff === -1) return `${score}` // birdie
-  if (diff === 0) return `${score}` // par
-  if (diff === 1) return `${score}` // bogey
-  return `${score}` // double+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function holeScoreLabel(score: number, _par: number): string {
+  return `${score}`
 }
 
 function holeScoreStyle(score: number, par: number): string {
@@ -85,6 +86,9 @@ export default function PublicTeamDetail() {
   const [golfers, setGolfers] = useState<(TeamGolfer & { scores: GolferScore[] })[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedGolfer, setExpandedGolfer] = useState<string | null>(null)
+  const [holeScores, setHoleScores] = useState<Record<string, CachedHoleScore[]>>({})
+  const [, setHoleScoresLive] = useState<Record<string, boolean>>({})
+  const [holeScoresLoading, setHoleScoresLoading] = useState<Record<string, boolean>>({})
 
   const loadData = useCallback(async () => {
     const { data: poolData } = await supabase
@@ -114,6 +118,39 @@ export default function PublicTeamDetail() {
 
   useEffect(() => { loadData() }, [loadData])
 
+  // Fetch hole-by-hole scores when a golfer is expanded
+  const fetchHoleScores = useCallback(async (golferId: string, poolId: string) => {
+    if (holeScores[golferId] || holeScoresLoading[golferId]) return
+
+    setHoleScoresLoading(prev => ({ ...prev, [golferId]: true }))
+
+    const playerId = SLASHGOLF_PLAYER_IDS[golferId] || null
+    const queryParams = new URLSearchParams({ golferId })
+    if (playerId) queryParams.set('playerId', playerId)
+
+    try {
+      const res = await fetch(`/api/pools/${poolId}/hole-scores?${queryParams}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.scores && data.scores.length > 0) {
+          setHoleScores(prev => ({ ...prev, [golferId]: data.scores }))
+          setHoleScoresLive(prev => ({ ...prev, [golferId]: !data.fromCache || data.scores.length > 0 }))
+        }
+      }
+    } catch {
+      // Silently fail, UI will use fake data
+    } finally {
+      setHoleScoresLoading(prev => ({ ...prev, [golferId]: false }))
+    }
+  }, [holeScores, holeScoresLoading])
+
+  // Trigger fetch when golfer is expanded
+  useEffect(() => {
+    if (expandedGolfer && pool) {
+      fetchHoleScores(expandedGolfer, pool.id)
+    }
+  }, [expandedGolfer, pool, fetchHoleScores])
+
   if (loading) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center">
@@ -141,6 +178,29 @@ export default function PublicTeamDetail() {
     if (score < 0) return 'text-score-green'
     if (score > 0) return 'text-score-red'
     return 'text-gray-900'
+  }
+
+  // Build hole scores for a round from real data or fallback to fake
+  function getHoleScoresForRound(
+    golferId: string,
+    roundNum: number,
+    toPar: number,
+    thru: number
+  ): { scores: (number | null)[]; isLive: boolean } {
+    const realScores = holeScores[golferId]
+    if (realScores && realScores.length > 0) {
+      const roundHoles = realScores.filter(s => s.round_number === roundNum)
+      if (roundHoles.length > 0) {
+        const scores: (number | null)[] = Array(18).fill(null)
+        for (const h of roundHoles) {
+          if (h.hole_number >= 1 && h.hole_number <= 18) {
+            scores[h.hole_number - 1] = h.score
+          }
+        }
+        return { scores, isLive: true }
+      }
+    }
+    return { scores: generateFakeHoleScores(toPar, thru), isLive: false }
   }
 
   return (
@@ -218,13 +278,16 @@ export default function PublicTeamDetail() {
                 {/* Expanded scorecard */}
                 {isExpanded && !g.is_dropped && (
                   <div className="border-t border-muted-gray/20 bg-cream/30">
+                    {holeScoresLoading[g.golfer_id] && (
+                      <div className="px-4 py-2 text-xs text-muted-gray italic">Loading scorecard...</div>
+                    )}
                     {roundScores.map((rs, roundIdx) => {
                       if (!rs) return null
                       const roundNum = roundIdx + 1
                       const thru = rs.thru || 18
-                      const holeScores = generateFakeHoleScores(rs.toPar, thru)
-                      const front9 = holeScores.slice(0, 9)
-                      const back9 = holeScores.slice(9, 18)
+                      const { scores: holeScoresArr, isLive } = getHoleScoresForRound(g.golfer_id, roundNum, rs.toPar, thru)
+                      const front9 = holeScoresArr.slice(0, 9)
+                      const back9 = holeScoresArr.slice(9, 18)
                       const front9Total = front9.filter((s): s is number => s !== null).reduce((a, b) => a + b, 0)
                       const back9Total = back9.filter((s): s is number => s !== null).reduce((a, b) => a + b, 0)
                       const front9Par = AUGUSTA_PARS.slice(0, 9).reduce((a, b) => a + b, 0)
@@ -233,9 +296,16 @@ export default function PublicTeamDetail() {
                       return (
                         <div key={roundNum} className="px-4 py-3 border-b border-muted-gray/10 last:border-b-0">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold text-muted-gray uppercase tracking-wide">
-                              Round {roundNum}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-muted-gray uppercase tracking-wide">
+                                Round {roundNum}
+                              </span>
+                              {isLive && (
+                                <span className="text-[9px] bg-score-green/10 text-score-green px-1.5 py-0.5 rounded-sm font-medium">
+                                  LIVE
+                                </span>
+                              )}
+                            </div>
                             <span className={`text-sm font-mono font-bold ${scoreColor(rs.toPar)}`}>
                               {formatScore(rs.toPar)}
                               {thru < 18 && <span className="text-[10px] text-muted-gray font-normal ml-1">thru {thru}</span>}
