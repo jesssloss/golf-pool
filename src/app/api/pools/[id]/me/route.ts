@@ -8,6 +8,7 @@ export async function GET(
 ) {
   const cookieStore = cookies()
   const sessionToken = cookieStore.get(`session_token_${params.id}`)?.value
+  const commissionerToken = cookieStore.get(`commissioner_token_${params.id}`)?.value
 
   if (!sessionToken) {
     return NextResponse.json({ team: null, isCommissioner: false })
@@ -22,7 +23,7 @@ export async function GET(
     .eq('id', params.id)
     .single()
 
-  const isCommissioner = !!(pool && pool.commissioner_token === sessionToken)
+  const isCommissioner = !!(pool && pool.commissioner_token === commissionerToken)
 
   // Then check if this token matches any team
   const { data: team } = await supabase

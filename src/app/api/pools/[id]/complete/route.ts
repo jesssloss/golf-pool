@@ -4,16 +4,15 @@ import { cookies } from 'next/headers'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; teamId: string } }
+  { params }: { params: { id: string } }
 ) {
   const cookieStore = cookies()
   const commissionerToken = cookieStore.get(`commissioner_token_${params.id}`)?.value
   const supabase = createServerSupabaseClient()
 
-  // Verify commissioner
   const { data: pool } = await supabase
     .from('pools')
-    .select('commissioner_token')
+    .select('*')
     .eq('id', params.id)
     .single()
 
@@ -21,12 +20,18 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 
-  const { paid } = await request.json()
+  if (pool.status !== 'active') {
+    return NextResponse.json({ error: 'Pool must be active to mark as complete' }, { status: 400 })
+  }
 
-  await supabase
-    .from('teams')
-    .update({ buy_in_paid: paid })
-    .eq('id', params.teamId)
+  const { error } = await supabase
+    .from('pools')
+    .update({ status: 'complete' })
+    .eq('id', params.id)
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   return NextResponse.json({ success: true })
 }

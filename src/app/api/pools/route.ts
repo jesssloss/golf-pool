@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServerSupabaseClient()
   const sessionToken = crypto.randomUUID()
+  const commissionerToken = crypto.randomUUID()
   const inviteCode = generateInviteCode()
 
   // Check slug uniqueness if provided
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
     .insert({
       name: poolName,
       invite_code: inviteCode,
-      commissioner_token: sessionToken,
+      commissioner_token: commissionerToken,
       players_per_team: playersPerTeam,
       scoring_players: scoringPlayers,
       missed_cut_score: missedCutScore,
@@ -132,6 +133,14 @@ export async function POST(request: NextRequest) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 30, // 30 days
+    path: '/',
+  })
+  // Set separate commissioner cookie
+  cookieStore.set(`commissioner_token_${pool.id}`, commissionerToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 30,
     path: '/',
   })
 

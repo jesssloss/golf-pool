@@ -8,7 +8,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   const cookieStore = cookies()
-  const sessionToken = cookieStore.get(`session_token_${params.id}`)?.value
+  const commissionerToken = cookieStore.get(`commissioner_token_${params.id}`)?.value
   const supabase = createServerSupabaseClient()
 
   // Verify commissioner
@@ -18,7 +18,7 @@ export async function POST(
     .eq('id', params.id)
     .single()
 
-  if (!pool || pool.commissioner_token !== sessionToken) {
+  if (!pool || pool.commissioner_token !== commissionerToken) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 

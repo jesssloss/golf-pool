@@ -78,7 +78,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   const cookieStore = cookies()
-  const sessionToken = cookieStore.get(`session_token_${params.id}`)?.value
+  const commissionerToken = cookieStore.get(`commissioner_token_${params.id}`)?.value
   const supabase = createServerSupabaseClient()
 
   // Verify commissioner
@@ -88,8 +88,13 @@ export async function POST(
     .eq('id', params.id)
     .single()
 
-  if (!pool || pool.commissioner_token !== sessionToken) {
+  if (!pool || pool.commissioner_token !== commissionerToken) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  }
+
+  // Only allow in development
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Test scores are not available in production' }, { status: 403 })
   }
 
   // Get all golfers assigned to teams in this pool
@@ -184,7 +189,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const cookieStore = cookies()
-  const sessionToken = cookieStore.get(`session_token_${params.id}`)?.value
+  const commissionerToken = cookieStore.get(`commissioner_token_${params.id}`)?.value
   const supabase = createServerSupabaseClient()
 
   const { data: pool } = await supabase
@@ -193,7 +198,7 @@ export async function DELETE(
     .eq('id', params.id)
     .single()
 
-  if (!pool || pool.commissioner_token !== sessionToken) {
+  if (!pool || pool.commissioner_token !== commissionerToken) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 

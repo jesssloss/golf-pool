@@ -29,7 +29,7 @@ export default function CreatePool() {
     commissionerName: '',
     playersPerTeam: 6,
     scoringPlayers: 5,
-    missedCutScore: 80,
+    missedCutScore: 10,
     dropDeadlineRound: 2,
     draftTimerSeconds: 90,
     draftMode: 'live' as 'live' | 'manual',
@@ -338,14 +338,14 @@ export default function CreatePool() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Missed Cut Score</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Penalty Per Missed Round</label>
                     <input
                       type="number"
                       value={formData.missedCutScore}
                       onChange={e => setFormData({ ...formData, missedCutScore: parseInt(e.target.value) })}
                       className={inputClass}
                     />
-                    <p className="text-xs text-muted-gray mt-1">Score added per missed round (e.g. +80 for R3 and R4)</p>
+                    <p className="text-xs text-muted-gray mt-1">Added per unplayed round. Cut after R2 with +10 = +20 total penalty.</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Drop After Round</label>

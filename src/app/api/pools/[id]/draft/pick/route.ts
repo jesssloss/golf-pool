@@ -9,6 +9,7 @@ export async function POST(
 ) {
   const cookieStore = cookies()
   const sessionToken = cookieStore.get(`session_token_${params.id}`)?.value
+  const commissionerToken = cookieStore.get(`commissioner_token_${params.id}`)?.value
   const supabase = createServerSupabaseClient()
   const { golferId, golferName } = await request.json()
 
@@ -37,27 +38,15 @@ export async function POST(
     return NextResponse.json({ error: 'Not in this pool' }, { status: 403 })
   }
 
-  const isCommissioner = pool.commissioner_token === sessionToken
+  const isCommissioner = pool.commissioner_token === commissionerToken
   if (myTeam.id !== expectedTeamId && !isCommissioner) {
     return NextResponse.json({ error: 'Not your turn' }, { status: 400 })
-  }
-
-  // Check golfer not already picked
-  const { data: existingPick } = await supabase
-    .from('draft_picks')
-    .select('id')
-    .eq('pool_id', params.id)
-    .eq('golfer_id', golferId)
-    .single()
-
-  if (existingPick) {
-    return NextResponse.json({ error: 'Golfer already drafted' }, { status: 400 })
   }
 
   // Make the pick
   const pickingTeamId = isCommissioner && myTeam.id !== expectedTeamId ? expectedTeamId : myTeam.id
 
-  await supabase.from('draft_picks').insert({
+  const { error: pickError } = await supabase.from('draft_picks').insert({
     pool_id: params.id,
     team_id: pickingTeamId,
     golfer_id: golferId,
@@ -66,14 +55,29 @@ export async function POST(
     round,
   })
 
+  // Handle unique constraint violation (golfer already drafted)
+  if (pickError) {
+    if (pickError.code === '23505') {
+      return NextResponse.json({ error: 'Golfer already drafted' }, { status: 400 })
+    }
+    return NextResponse.json({ error: pickError.message }, { status: 500 })
+  }
+
   const nextPick = draftState.current_pick + 1
 
   if (nextPick > draftState.total_picks) {
-    // Draft complete - advance pick counter
-    await supabase
+    // Draft complete - advance pick counter (atomic: only if still on expected pick)
+    const { data: updated } = await supabase
       .from('draft_state')
       .update({ current_pick: nextPick, timer_expires_at: null })
       .eq('pool_id', params.id)
+      .eq('current_pick', draftState.current_pick)
+      .select()
+
+    if (!updated || updated.length === 0) {
+      // Another request already advanced the pick
+      return NextResponse.json({ success: true, nextPick })
+    }
 
     if (pool.draft_mode === 'manual') {
       // Manual mode: wait for commissioner to finalize via /draft/finalize
@@ -115,7 +119,7 @@ export async function POST(
       }
     }
   } else {
-    // Advance to next pick
+    // Advance to next pick (atomic: only if still on expected pick)
     // No timer for manual mode or unlimited timer (draft_timer_seconds === 0)
     const useTimer = pool.draft_mode !== 'manual' && pool.draft_timer_seconds > 0
     await supabase
@@ -128,6 +132,7 @@ export async function POST(
         updated_at: new Date().toISOString(),
       })
       .eq('pool_id', params.id)
+      .eq('current_pick', draftState.current_pick)
   }
 
   return NextResponse.json({ success: true, nextPick })

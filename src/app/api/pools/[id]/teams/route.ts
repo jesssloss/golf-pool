@@ -7,7 +7,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   const cookieStore = cookies()
-  const sessionToken = cookieStore.get(`session_token_${params.id}`)?.value
+  const commissionerToken = cookieStore.get(`commissioner_token_${params.id}`)?.value
   const supabase = createServerSupabaseClient()
 
   // Verify commissioner
@@ -17,7 +17,7 @@ export async function POST(
     .eq('id', params.id)
     .single()
 
-  if (!pool || pool.commissioner_token !== sessionToken) {
+  if (!pool || pool.commissioner_token !== commissionerToken) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 
@@ -27,6 +27,22 @@ export async function POST(
 
   if (pool.status !== 'lobby' && pool.status !== 'drafting') {
     return NextResponse.json({ error: 'Cannot add players after draft is finalized' }, { status: 400 })
+  }
+
+  // Check max player cap (field of ~60 golfers)
+  const FIELD_SIZE = 60
+  const maxTeams = pool.draft_mode === 'manual'
+    ? 50 // manual mode allows shared golfers, so no hard limit from field size
+    : Math.floor(FIELD_SIZE / pool.players_per_team)
+  const { count: teamCount } = await supabase
+    .from('teams')
+    .select('*', { count: 'exact', head: true })
+    .eq('pool_id', params.id)
+
+  if ((teamCount || 0) >= maxTeams) {
+    return NextResponse.json({
+      error: `Pool is full. Maximum ${maxTeams} teams.`
+    }, { status: 400 })
   }
 
   const { playerName } = await request.json()
@@ -65,7 +81,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const cookieStore = cookies()
-  const sessionToken = cookieStore.get(`session_token_${params.id}`)?.value
+  const commissionerToken = cookieStore.get(`commissioner_token_${params.id}`)?.value
   const supabase = createServerSupabaseClient()
 
   // Verify commissioner
@@ -75,7 +91,7 @@ export async function DELETE(
     .eq('id', params.id)
     .single()
 
-  if (!pool || pool.commissioner_token !== sessionToken) {
+  if (!pool || pool.commissioner_token !== commissionerToken) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 

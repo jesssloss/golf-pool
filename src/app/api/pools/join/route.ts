@@ -57,6 +57,20 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Check max player cap (field of ~60 golfers)
+  const FIELD_SIZE = 60
+  const maxTeams = Math.floor(FIELD_SIZE / pool.players_per_team)
+  const { count: teamCount } = await supabase
+    .from('teams')
+    .select('*', { count: 'exact', head: true })
+    .eq('pool_id', pool.id)
+
+  if ((teamCount || 0) >= maxTeams) {
+    return NextResponse.json({
+      error: `Pool is full. Maximum ${maxTeams} teams for a ${pool.players_per_team}-golfer draft.`
+    }, { status: 400 })
+  }
+
   // Check for duplicate name in this pool
   const { data: duplicateName } = await supabase
     .from('teams')

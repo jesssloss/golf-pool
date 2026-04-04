@@ -567,8 +567,29 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
           )
         })()}
 
-        {/* Seed Test Scores — Commissioner only, dev tool */}
+        {/* Mark Pool Complete — Commissioner only */}
         {!readOnly && isCommissioner && pool.status === 'active' && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={async () => {
+                if (!confirm('Mark this pool as complete? This will finalize standings and show the winner.')) return
+                const res = await fetch(`/api/pools/${poolId}/complete`, { method: 'POST' })
+                if (res.ok) {
+                  window.location.reload()
+                } else {
+                  const data = await res.json()
+                  alert(data.error || 'Failed to mark pool as complete')
+                }
+              }}
+              className="px-4 py-2 min-h-[44px] text-sm border border-pimento text-pimento rounded-sm hover:bg-pimento hover:text-white transition-colors"
+            >
+              Mark Pool Complete
+            </button>
+          </div>
+        )}
+
+        {/* Seed Test Scores — Commissioner only, dev only */}
+        {!readOnly && isCommissioner && pool.status === 'active' && process.env.NODE_ENV !== 'production' && (
           <div className="mt-6 text-center">
             <button
               onClick={async () => {
