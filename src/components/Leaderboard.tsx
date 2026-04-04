@@ -252,12 +252,6 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
                 Updated {lastUpdated.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
               </span>
             )}
-            <button
-              onClick={shareStandings}
-              className="text-sm px-3 py-2 min-h-[44px] border border-pimento text-pimento rounded-sm hover:bg-pimento hover:text-white transition-colors"
-            >
-              {copied ? 'Copied!' : 'Share'}
-            </button>
             {!readOnly && (
               <button
                 onClick={handleManualRefresh}
@@ -269,6 +263,38 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
             )}
           </div>
         </div>
+
+        {/* Shareable public URL */}
+        {pool.slug && (
+          <div className="bg-white rounded-sm p-3 mb-4 border border-muted-gray/20 flex items-center gap-2">
+            <code className="flex-1 text-sm font-mono text-pimento truncate">
+              pimento.bet/p/{pool.slug}
+            </code>
+            <button
+              onClick={() => {
+                const url = typeof window !== 'undefined'
+                  ? `${window.location.origin}/p/${pool.slug}`
+                  : `https://pimento.bet/p/${pool.slug}`
+                navigator.clipboard.writeText(url)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }}
+              className="text-sm px-3 py-2 min-h-[44px] border border-pimento text-pimento rounded-sm hover:bg-pimento hover:text-white transition-colors whitespace-nowrap"
+            >
+              {copied ? 'Copied!' : 'Copy Link'}
+            </button>
+          </div>
+        )}
+        {!pool.slug && (
+          <div className="mb-4 flex justify-end">
+            <button
+              onClick={shareStandings}
+              className="text-sm px-3 py-2 min-h-[44px] border border-pimento text-pimento rounded-sm hover:bg-pimento hover:text-white transition-colors"
+            >
+              {copied ? 'Copied!' : 'Share Standings'}
+            </button>
+          </div>
+        )}
 
         {/* Milestone banners */}
         {isComplete && winner && (
