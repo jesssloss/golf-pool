@@ -58,18 +58,22 @@ export async function POST(
     return NextResponse.json({ error: 'Duplicate golfers in selection' }, { status: 400 })
   }
 
-  // Check none of these golfers are already picked by other teams
-  const { data: existingPicks } = await supabase
-    .from('draft_picks')
-    .select('golfer_id, golfer_name')
-    .eq('pool_id', params.id)
-    .in('golfer_id', golferIds)
+  // For manual mode, allow shared golfers across teams (common in most pools).
+  // For live draft, enforce exclusive picks (snake draft).
+  if (pool.draft_mode !== 'manual') {
+    const { data: existingPicks } = await supabase
+      .from('draft_picks')
+      .select('golfer_id, golfer_name')
+      .eq('pool_id', params.id)
+      .neq('team_id', teamId)
+      .in('golfer_id', golferIds)
 
-  if (existingPicks && existingPicks.length > 0) {
-    const names = existingPicks.map(p => p.golfer_name).join(', ')
-    return NextResponse.json({
-      error: `Already picked by another team: ${names}`
-    }, { status: 400 })
+    if (existingPicks && existingPicks.length > 0) {
+      const names = existingPicks.map(p => p.golfer_name).join(', ')
+      return NextResponse.json({
+        error: `Already picked by another team: ${names}`
+      }, { status: 400 })
+    }
   }
 
   // Remove any existing picks for this team (in case of re-entry)
