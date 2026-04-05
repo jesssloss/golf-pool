@@ -123,7 +123,9 @@ npx vercel
 
 Or connect your GitHub repo to Vercel for automatic deployments. Set the environment variables in the Vercel dashboard.
 
-To enable automatic score updates during a tournament, set up a cron job (e.g., via Vercel Cron or an external service) that hits `/api/cron/scores` with a `Bearer <CRON_SECRET>` authorization header every 60 seconds.
+To enable automatic score updates during a tournament, set up a cron job that hits `/api/cron/scores` with a `Bearer <CRON_SECRET>` authorization header every 1-5 minutes.
+
+> **Note:** Vercel Hobby plans only support daily cron schedules. For live score updates during a tournament, use an external cron service (e.g., [cron-job.org](https://cron-job.org)) to hit the endpoint every 1-5 minutes.
 
 ## Architecture
 
