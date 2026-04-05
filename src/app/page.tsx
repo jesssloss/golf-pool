@@ -15,9 +15,8 @@ export default function Home() {
               priority
             />
           </div>
-          <div className="text-lg font-serif text-pimento/70 mb-1">2026</div>
           <h1 className="text-5xl md:text-6xl font-serif font-bold text-pimento mb-2 tracking-tight">
-            Masters Pool
+            Pimento
           </h1>
           <p className="text-xs text-muted-gray font-serif italic mb-4">
             Pimento Technology Incorporated

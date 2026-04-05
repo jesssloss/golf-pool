@@ -6,8 +6,8 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair' })
 
 export const metadata: Metadata = {
-  title: '2026 Masters Pool',
-  description: 'Pimento Technology Incorporated',
+  title: 'Pimento',
+  description: 'Draft your squad. Track live scores. Win the green jacket.',
 }
 
 export default function RootLayout({

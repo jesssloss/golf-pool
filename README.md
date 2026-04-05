@@ -1,4 +1,4 @@
-# Golf Pool
+# Pimento
 
 An open source, real-time golf tournament pool app. Create a pool, draft golfers with friends, and track live scores throughout any PGA tournament.
 
@@ -81,8 +81,8 @@ Players get a shareable public URL to track scores on their phone. No accounts n
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/jesssloss/golf-pool.git
-cd golf-pool
+git clone https://github.com/jesssloss/pimento.git
+cd pimento
 npm install
 ```
 
