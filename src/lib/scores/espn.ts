@@ -4,12 +4,12 @@ const ESPN_LEADERBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/golf
 
 interface ESPNCompetitor {
   id: string
-  athlete: {
-    displayName: string
+  athlete?: {
+    displayName?: string
     rank?: { current?: number }
   }
-  status: {
-    type: { name: string }
+  status?: {
+    type?: { name?: string }
     thru?: number
     period?: number
   }
@@ -23,48 +23,52 @@ export class ESPNScoresProvider implements ScoresProvider {
     const data = await this.fetchLeaderboard(tournamentId)
     const competitors = this.extractCompetitors(data)
 
-    return competitors.map(c => {
-      const name = c.athlete.displayName
-      const id = name
-        .toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-      return { id, name, world_ranking: c.athlete.rank?.current || null }
-    })
+    return competitors
+      .filter(c => c.athlete?.displayName)
+      .map(c => {
+        const name = c.athlete!.displayName!
+        const id = name
+          .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/\s+/g, '-')
+        return { id, name, world_ranking: c.athlete!.rank?.current || null }
+      })
   }
 
   async getScores(tournamentId: string): Promise<GolferScoreData[]> {
     const data = await this.fetchLeaderboard(tournamentId)
     const competitors = this.extractCompetitors(data)
 
-    return competitors.map(c => {
-      const name = c.athlete.displayName
-      // Generate slug ID matching our internal format (same as Slash Golf provider)
-      const golferId = name
-        .toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
+    return competitors
+      .filter(c => c.athlete?.displayName)
+      .map(c => {
+        const name = c.athlete!.displayName!
+        // Generate slug ID matching our internal format (same as Slash Golf provider)
+        const golferId = name
+          .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/\s+/g, '-')
 
-      const rounds = (c.linescores || [])
-        .map((ls, i) => ({ round_number: i + 1, value: ls.value }))
-        .filter(r => r.value != null && r.value > 0)
-        .map(r => ({ round_number: r.round_number, score_to_par: r.value - 72 }))
+        const rounds = (c.linescores || [])
+          .map((ls, i) => ({ round_number: i + 1, value: ls.value }))
+          .filter(r => r.value != null && r.value > 0)
+          .map(r => ({ round_number: r.round_number, score_to_par: r.value - 72 }))
 
-      const totalToPar = this.parseTotalToPar(c.score)
-      const status = this.mapStatus(c.status.type.name)
+        const totalToPar = this.parseTotalToPar(c.score)
+        const status = this.mapStatus(c.status?.type?.name || '')
 
-      return {
-        golfer_id: golferId,
-        golfer_name: name,
-        rounds,
-        total_to_par: totalToPar,
-        thru_hole: c.status.thru || null,
-        status,
-        world_ranking: c.athlete.rank?.current || null,
-      }
-    })
+        return {
+          golfer_id: golferId,
+          golfer_name: name,
+          rounds,
+          total_to_par: totalToPar,
+          thru_hole: c.status?.thru || null,
+          status,
+          world_ranking: c.athlete!.rank?.current || null,
+        }
+      })
   }
 
   private async fetchLeaderboard(tournamentId: string): Promise<unknown> {
