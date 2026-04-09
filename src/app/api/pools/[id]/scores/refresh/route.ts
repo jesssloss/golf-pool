@@ -77,8 +77,9 @@ export async function POST(
           month_key: monthKey,
         })
 
-        if (scores.length === 0) {
-          console.log('Slash Golf leaderboard returned empty, falling back to ESPN')
+        const hasRoundData = scores.some(s => s.rounds.length > 0)
+        if (scores.length === 0 || !hasRoundData) {
+          console.log('Slash Golf leaderboard returned no round data, falling back to ESPN')
           scores = await espnProvider.getScores('')
           source = 'espn'
         }

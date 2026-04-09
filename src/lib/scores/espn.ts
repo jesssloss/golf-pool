@@ -47,10 +47,10 @@ export class ESPNScoresProvider implements ScoresProvider {
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-')
 
-      const rounds = (c.linescores || []).map((ls, i) => ({
-        round_number: i + 1,
-        score_to_par: ls.value - 72, // Par 72 — adjust if your course differs
-      }))
+      const rounds = (c.linescores || [])
+        .map((ls, i) => ({ round_number: i + 1, value: ls.value }))
+        .filter(r => r.value != null && r.value > 0)
+        .map(r => ({ round_number: r.round_number, score_to_par: r.value - 72 }))
 
       const totalToPar = this.parseTotalToPar(c.score)
       const status = this.mapStatus(c.status.type.name)

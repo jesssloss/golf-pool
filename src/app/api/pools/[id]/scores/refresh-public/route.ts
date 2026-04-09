@@ -82,9 +82,10 @@ export async function POST(
           month_key: monthKey,
         })
 
-        // If Slash Golf returned no data, fall back to ESPN
-        if (scores.length === 0) {
-          console.log('Slash Golf leaderboard returned empty, falling back to ESPN')
+        // If Slash Golf returned no data or no round details, fall back to ESPN
+        const hasRoundData = scores.some(s => s.rounds.length > 0)
+        if (scores.length === 0 || !hasRoundData) {
+          console.log('Slash Golf leaderboard returned no round data, falling back to ESPN')
           scores = await espnProvider.getScores('')
           source = 'espn'
         }
