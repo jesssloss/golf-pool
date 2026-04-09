@@ -18,9 +18,9 @@ export const PLAYOFF_RESERVE = 200
 // --- Scorecard types ---
 
 interface SlashGolfHole {
-  holeId: { $numberInt: string }
-  holeScore: { $numberInt: string }
-  par: { $numberInt: string }
+  holeId: number | string | { $numberInt: string }
+  holeScore: number | string | { $numberInt: string }
+  par: number | string | { $numberInt: string }
 }
 
 interface SlashGolfScorecardRound {
@@ -28,9 +28,9 @@ interface SlashGolfScorecardRound {
   year: string
   tournId: string
   playerId: string
-  roundId: { $numberInt: string }
+  roundId: number | string | { $numberInt: string }
   roundComplete: boolean
-  currentHole: { $numberInt: string }
+  currentHole: number | string | { $numberInt: string }
   currentRoundScore: string
   holes: Record<string, SlashGolfHole>
 }
@@ -237,18 +237,24 @@ export class SlashGolfProvider {
 
     if (!Array.isArray(data)) return []
 
-    return data.map(round => ({
-      round_number: parseInt(round.roundId.$numberInt),
-      round_complete: round.roundComplete,
-      current_hole: parseInt(round.currentHole.$numberInt),
-      holes: Object.values(round.holes)
-        .map(h => ({
-          hole_number: parseInt(h.holeId.$numberInt),
-          par: parseInt(h.par.$numberInt),
-          score: parseInt(h.holeScore.$numberInt),
-        }))
-        .sort((a, b) => a.hole_number - b.hole_number),
-    }))
+    return data.map(round => {
+      const roundNum = this.parseBsonInt(round.roundId)
+      const currentHole = this.parseBsonInt(round.currentHole)
+
+      return {
+        round_number: roundNum ?? 0,
+        round_complete: round.roundComplete,
+        current_hole: currentHole ?? 0,
+        holes: Object.values(round.holes)
+          .map(h => ({
+            hole_number: this.parseBsonInt(h.holeId) ?? 0,
+            par: this.parseBsonInt(h.par) ?? 0,
+            score: this.parseBsonInt(h.holeScore) ?? 0,
+          }))
+          .filter(h => h.hole_number > 0 && h.par > 0)
+          .sort((a, b) => a.hole_number - b.hole_number),
+      }
+    }).filter(r => r.round_number > 0)
   }
 }
 
