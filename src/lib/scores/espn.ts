@@ -14,7 +14,7 @@ interface ESPNCompetitor {
     period?: number
   }
   score?: string
-  linescores?: { value: number; displayValue: string }[]
+  linescores?: { value?: number; displayValue?: string; period?: number }[]
   statistics?: { name: string; displayValue: string }[]
 }
 
@@ -51,10 +51,15 @@ export class ESPNScoresProvider implements ScoresProvider {
           .replace(/[^a-z0-9\s-]/g, '')
           .replace(/\s+/g, '-')
 
+        // Use displayValue (e.g. "-3", "E", "+2") — the actual round score to par.
+        // ESPN's linescores[].value is NOT total strokes, it's an internal metric.
         const rounds = (c.linescores || [])
-          .map((ls, i) => ({ round_number: i + 1, value: ls.value }))
-          .filter(r => r.value != null && r.value > 0)
-          .map(r => ({ round_number: r.round_number, score_to_par: r.value - 72 }))
+          .filter(ls => ls.displayValue != null && ls.displayValue !== '')
+          .map((ls, i) => ({
+            round_number: ls.period || (i + 1),
+            score_to_par: ls.displayValue === 'E' ? 0 : parseInt(ls.displayValue!, 10),
+          }))
+          .filter(r => !isNaN(r.score_to_par))
 
         const totalToPar = this.parseTotalToPar(c.score)
         const status = this.mapStatus(c.status?.type?.name || '')
