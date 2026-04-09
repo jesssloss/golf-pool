@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -126,8 +126,11 @@ export default function TeamDetail() {
   // Fetch hole-by-hole scores when a golfer is expanded
   const [noDataGolfers, setNoDataGolfers] = useState<Set<string>>(new Set())
 
+  const fetchHoleScoresRef = useRef<Set<string>>(new Set())
+
   const fetchHoleScores = useCallback(async (golferId: string) => {
-    if (holeScores[golferId] || holeScoresLoading[golferId] || noDataGolfers.has(golferId)) return
+    if (holeScores[golferId] || noDataGolfers.has(golferId) || fetchHoleScoresRef.current.has(golferId)) return
+    fetchHoleScoresRef.current.add(golferId)
 
     setHoleScoresLoading(prev => ({ ...prev, [golferId]: true }))
 
@@ -139,20 +142,22 @@ export default function TeamDetail() {
       const res = await fetch(`/api/pools/${poolId}/hole-scores?${queryParams}`)
       if (res.ok) {
         const data = await res.json()
-        if (data.noData) {
-          // Tournament not running or no scorecard available - don't retry
+        if (data.noData || !data.scores || data.scores.length === 0) {
           setNoDataGolfers(prev => new Set(prev).add(golferId))
-        } else if (data.scores && data.scores.length > 0) {
+        } else {
           setHoleScores(prev => ({ ...prev, [golferId]: data.scores }))
-          setHoleScoresLive(prev => ({ ...prev, [golferId]: !data.fromCache || data.scores.length > 0 }))
+          setHoleScoresLive(prev => ({ ...prev, [golferId]: !data.fromCache }))
         }
+      } else {
+        setNoDataGolfers(prev => new Set(prev).add(golferId))
       }
     } catch {
-      // Silently fail, UI will use fake data
+      setNoDataGolfers(prev => new Set(prev).add(golferId))
     } finally {
       setHoleScoresLoading(prev => ({ ...prev, [golferId]: false }))
+      fetchHoleScoresRef.current.delete(golferId)
     }
-  }, [holeScores, holeScoresLoading, noDataGolfers, poolId])
+  }, [holeScores, noDataGolfers, poolId])
 
   useEffect(() => {
     if (expandedGolfer) {

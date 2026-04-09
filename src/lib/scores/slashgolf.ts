@@ -1,8 +1,17 @@
 const RAPIDAPI_HOST = 'live-golf-data.p.rapidapi.com'
 const BASE_URL = `https://${RAPIDAPI_HOST}`
 
-/** Leave a 10-call buffer from the 250 free tier limit */
-export const MONTHLY_CALL_LIMIT = 240
+/** Pro tier: 2000 calls/month */
+export const MONTHLY_CALL_LIMIT = 2000
+
+/**
+ * Daily budget: spread calls across tournament days with a reserve.
+ * Masters is 4 rounds (Thu-Sun) + possible playoff.
+ * Reserve 200 calls for playoff/overflow, split the rest across 5 days.
+ * 5 days * 360/day = 1800 + 200 reserve = 2000
+ */
+export const DAILY_CALL_BUDGET = 360
+export const PLAYOFF_RESERVE = 200
 
 interface SlashGolfHole {
   holeId: { $numberInt: string }

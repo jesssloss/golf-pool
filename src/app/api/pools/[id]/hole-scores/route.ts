@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { slashGolfProvider, MONTHLY_CALL_LIMIT } from '@/lib/scores/slashgolf'
+import { slashGolfProvider, MONTHLY_CALL_LIMIT, DAILY_CALL_BUDGET } from '@/lib/scores/slashgolf'
 
 export async function GET(
   request: NextRequest,
@@ -51,7 +51,7 @@ export async function GET(
   }
 
   let needsFetch = false
-  const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000)
+  const staleThreshold = new Date(Date.now() - 3 * 60 * 1000)
 
   // Check each active round
   for (const gs of golferScores || []) {
@@ -67,25 +67,38 @@ export async function GET(
     // Complete rounds never need re-fetching
     if (completedRounds.has(round)) continue
 
-    // In-progress rounds: re-fetch if cache is > 10 min old
-    if (cached.fetchedAt < tenMinAgo) {
+    // In-progress rounds: re-fetch if cache is > 3 min old
+    if (cached.fetchedAt < staleThreshold) {
       needsFetch = true
       break
     }
   }
 
   if (needsFetch && playerId) {
-    // Check API budget
-    const monthKey = new Date().toISOString().slice(0, 7) // YYYY-MM
-    const { count } = await supabase
-      .from('api_usage')
-      .select('*', { count: 'exact', head: true })
-      .eq('provider', 'slashgolf')
-      .eq('month_key', monthKey)
+    // Check API budget (monthly + daily)
+    const monthKey = new Date().toISOString().slice(0, 7)
+    const todayKey = new Date().toISOString().slice(0, 10)
 
-    const callsUsed = count || 0
+    const [monthUsage, todayUsage] = await Promise.all([
+      supabase
+        .from('api_usage')
+        .select('*', { count: 'exact', head: true })
+        .eq('provider', 'slashgolf')
+        .eq('month_key', monthKey),
+      supabase
+        .from('api_usage')
+        .select('*', { count: 'exact', head: true })
+        .eq('provider', 'slashgolf')
+        .gte('called_at', `${todayKey}T00:00:00Z`)
+        .lt('called_at', `${todayKey}T23:59:59Z`),
+    ])
 
-    if (callsUsed < MONTHLY_CALL_LIMIT) {
+    const callsUsed = monthUsage.count || 0
+    const todayCallsUsed = todayUsage.count || 0
+    const hasMonthBudget = callsUsed < MONTHLY_CALL_LIMIT
+    const hasDayBudget = todayCallsUsed < DAILY_CALL_BUDGET
+
+    if (hasMonthBudget && hasDayBudget) {
       try {
         const scorecards = await slashGolfProvider.getScorecard(playerId)
 
@@ -160,8 +173,10 @@ export async function GET(
       scores: cachedScores || [],
       apiCallsUsed: callsUsed,
       apiCallsLimit: MONTHLY_CALL_LIMIT,
+      dailyCallsUsed: todayCallsUsed,
+      dailyCallsLimit: DAILY_CALL_BUDGET,
       fromCache: true,
-      limitReached: callsUsed >= MONTHLY_CALL_LIMIT,
+      limitReached: !hasMonthBudget || !hasDayBudget,
     })
   }
 
