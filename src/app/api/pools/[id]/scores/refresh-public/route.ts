@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { espnProvider } from '@/lib/scores/espn'
 import { slashGolfProvider, MONTHLY_CALL_LIMIT, DAILY_CALL_BUDGET } from '@/lib/scores/slashgolf'
+import { espnProvider } from '@/lib/scores/espn'
 import { SLASHGOLF_PLAYER_IDS } from '@/lib/data/slashgolf-ids'
+import type { GolferScoreData } from '@/types'
 
 // Simple in-memory rate limit: one refresh per pool per 2 minutes
 const lastRefresh = new Map<string, number>()
@@ -42,9 +43,63 @@ export async function POST(
   }
 
   try {
-    // 1. Refresh ESPN summary scores
-    const scores = await espnProvider.getScores('')
+    // 1. Try Slash Golf leaderboard first (primary source)
+    let scores: GolferScoreData[]
+    let source: 'slashgolf' | 'espn'
 
+    // Check daily budget for Slash Golf
+    const todayKey = new Date().toISOString().slice(0, 10)
+    const monthKey = new Date().toISOString().slice(0, 7)
+
+    const [monthUsage, todayUsage] = await Promise.all([
+      supabase
+        .from('api_usage')
+        .select('*', { count: 'exact', head: true })
+        .eq('provider', 'slashgolf')
+        .eq('month_key', monthKey),
+      supabase
+        .from('api_usage')
+        .select('*', { count: 'exact', head: true })
+        .eq('provider', 'slashgolf')
+        .gte('called_at', `${todayKey}T00:00:00Z`)
+        .lt('called_at', `${todayKey}T23:59:59Z`),
+    ])
+
+    const monthCallsUsed = monthUsage.count || 0
+    const todayCallsUsed = todayUsage.count || 0
+    const hasSlashGolfBudget =
+      monthCallsUsed < MONTHLY_CALL_LIMIT && todayCallsUsed < DAILY_CALL_BUDGET
+
+    if (hasSlashGolfBudget) {
+      try {
+        scores = await slashGolfProvider.getLeaderboard()
+        source = 'slashgolf'
+
+        // Log API call
+        await supabase.from('api_usage').insert({
+          provider: 'slashgolf',
+          endpoint: 'leaderboard',
+          month_key: monthKey,
+        })
+
+        // If Slash Golf returned no data, fall back to ESPN
+        if (scores.length === 0) {
+          console.log('Slash Golf leaderboard returned empty, falling back to ESPN')
+          scores = await espnProvider.getScores('')
+          source = 'espn'
+        }
+      } catch (err) {
+        console.error('Slash Golf leaderboard error, falling back to ESPN:', err)
+        scores = await espnProvider.getScores('')
+        source = 'espn'
+      }
+    } else {
+      // Over budget, use ESPN
+      scores = await espnProvider.getScores('')
+      source = 'espn'
+    }
+
+    // 2. Upsert scores to database
     for (const golfer of scores) {
       await supabase
         .from('golfer_scores')
@@ -85,16 +140,19 @@ export async function POST(
 
     lastRefresh.set(poolId, now)
 
-    // 2. Proactively fetch hole-by-hole scores for all drafted golfers
+    // 3. Proactively fetch hole-by-hole scores for drafted golfers
     let holeScoresFetched = 0
-    try {
-      holeScoresFetched = await fetchHoleScoresForPool(supabase, poolId, scores)
-    } catch (err) {
-      console.error('Hole scores batch fetch error:', err)
+    if (source === 'slashgolf' && hasSlashGolfBudget) {
+      try {
+        holeScoresFetched = await fetchHoleScoresForPool(supabase, poolId, scores, todayCallsUsed + 1, monthCallsUsed + 1)
+      } catch (err) {
+        console.error('Hole scores batch fetch error:', err)
+      }
     }
 
     return NextResponse.json({
       success: true,
+      source,
       count: scores.length,
       holeScoresFetched,
     })
@@ -113,35 +171,16 @@ export async function POST(
 async function fetchHoleScoresForPool(
   supabase: ReturnType<typeof createServerSupabaseClient>,
   poolId: string,
-  espnScores: Awaited<ReturnType<typeof espnProvider.getScores>>
+  leaderboardScores: GolferScoreData[],
+  todayCallsUsed: number,
+  monthCallsUsed: number
 ): Promise<number> {
-  // Check API budget: enforce both monthly and daily limits
-  const now = new Date()
-  const monthKey = now.toISOString().slice(0, 7)
-  const todayKey = now.toISOString().slice(0, 10)
-
-  const [monthUsage, todayUsage] = await Promise.all([
-    supabase
-      .from('api_usage')
-      .select('*', { count: 'exact', head: true })
-      .eq('provider', 'slashgolf')
-      .eq('month_key', monthKey),
-    supabase
-      .from('api_usage')
-      .select('*', { count: 'exact', head: true })
-      .eq('provider', 'slashgolf')
-      .gte('called_at', `${todayKey}T00:00:00Z`)
-      .lt('called_at', `${todayKey}T23:59:59Z`),
-  ])
-
-  const monthCallsUsed = monthUsage.count || 0
-  const todayCallsUsed = todayUsage.count || 0
-
-  const monthRemaining = MONTHLY_CALL_LIMIT - monthCallsUsed
   const todayRemaining = DAILY_CALL_BUDGET - todayCallsUsed
-  const callsRemaining = Math.min(monthRemaining, todayRemaining)
-
+  const monthRemaining = MONTHLY_CALL_LIMIT - monthCallsUsed
+  const callsRemaining = Math.min(todayRemaining, monthRemaining)
   if (callsRemaining <= 0) return 0
+
+  const monthKey = new Date().toISOString().slice(0, 7)
 
   // Get all drafted golfers for this pool
   const { data: teamGolfers } = await supabase
@@ -152,7 +191,7 @@ async function fetchHoleScoresForPool(
 
   if (!teamGolfers || teamGolfers.length === 0) return 0
 
-  // Dedupe golfer IDs (shared golfers across teams in manual mode)
+  // Dedupe golfer IDs
   const uniqueGolfers = new Map<string, string>()
   for (const tg of teamGolfers) {
     if (!uniqueGolfers.has(tg.golfer_id)) {
@@ -160,14 +199,14 @@ async function fetchHoleScoresForPool(
     }
   }
 
-  // Find golfers with in-progress rounds (thru_hole < 18 and status active)
+  // Find golfers with in-progress rounds
   const activeGolferIds = new Set(
-    espnScores
+    leaderboardScores
       .filter(s => s.status === 'active' && s.thru_hole !== null && s.thru_hole < 18)
       .map(s => s.golfer_id)
   )
 
-  // Check existing cache to skip golfers with fresh data (5 min for background batch)
+  // Check existing cache
   const staleThreshold = new Date(Date.now() - 5 * 60 * 1000)
   const { data: cachedHoleScores } = await supabase
     .from('hole_scores')
@@ -182,26 +221,24 @@ async function fetchHoleScoresForPool(
     }
   }
 
-  // Build fetch list: drafted golfers that are actively playing and have stale/no cache
+  // Build fetch list
   const toFetch: { golferId: string; golferName: string; playerId: string }[] = []
   uniqueGolfers.forEach((golferName, golferId) => {
     const playerId = SLASHGOLF_PLAYER_IDS[golferId]
-    if (!playerId) return // No mapping, can't fetch
+    if (!playerId) return
 
-    // Always fetch if no cache exists
     const lastFetch = latestFetchByGolfer.get(golferId)
     if (!lastFetch) {
       toFetch.push({ golferId, golferName, playerId })
       return
     }
 
-    // For active golfers mid-round, fetch if cache is stale
     if (activeGolferIds.has(golferId) && lastFetch < staleThreshold) {
       toFetch.push({ golferId, golferName, playerId })
     }
   })
 
-  // Cap at remaining budget and max 10 per cycle to spread calls out
+  // Cap at 10 per cycle
   const maxPerCycle = Math.min(10, callsRemaining)
   const batch = toFetch.slice(0, maxPerCycle)
   let fetched = 0
@@ -211,14 +248,12 @@ async function fetchHoleScoresForPool(
       const scorecards = await slashGolfProvider.getScorecard(playerId)
       if (scorecards.length === 0) continue
 
-      // Log API call
       await supabase.from('api_usage').insert({
         provider: 'slashgolf',
         endpoint: 'scorecard',
         month_key: monthKey,
       })
 
-      // Cache hole scores
       for (const round of scorecards) {
         const upserts = round.holes.map(h => ({
           pool_id: poolId,
@@ -239,7 +274,6 @@ async function fetchHoleScoresForPool(
       fetched++
     } catch (err) {
       console.error(`Hole scores fetch failed for ${golferId}:`, err)
-      // Continue with next golfer
     }
   }
 
