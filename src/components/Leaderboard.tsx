@@ -170,20 +170,26 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
     return () => { supabase.removeChannel(channel) }
   }, [poolId, supabase, loadStandings])
 
-  // Auto-refresh: pull fresh ESPN scores every 60s for active pools
+  // Auto-refresh: pull fresh ESPN scores every 2 min for active pools
+  const refreshUrl = readOnly
+    ? `/api/pools/${poolId}/scores/refresh-public`
+    : `/api/pools/${poolId}/scores/refresh`
+
   useEffect(() => {
     if (pool.status !== 'active') return
+    // Fire immediately on mount, then every 2 minutes
+    fetch(refreshUrl, { method: 'POST' }).then(() => loadStandings())
     const interval = setInterval(async () => {
-      await fetch(`/api/pools/${poolId}/scores/refresh`, { method: 'POST' })
+      await fetch(refreshUrl, { method: 'POST' })
       loadStandings()
-    }, 60_000)
+    }, 120_000)
     return () => clearInterval(interval)
-  }, [pool.status, poolId, loadStandings])
+  }, [pool.status, poolId, loadStandings, refreshUrl])
 
   const handleManualRefresh = async () => {
     setRefreshing(true)
     try {
-      await fetch(`/api/pools/${poolId}/scores/refresh`, { method: 'POST' })
+      await fetch(refreshUrl, { method: 'POST' })
       await loadStandings()
     } finally {
       setRefreshing(false)
