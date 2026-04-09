@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
+import { slashGolfProvider, MONTHLY_CALL_LIMIT, DAILY_CALL_BUDGET } from '@/lib/scores/slashgolf'
 import { espnProvider } from '@/lib/scores/espn'
+import type { GolferScoreData } from '@/types'
 
 export async function POST(
   request: NextRequest,
@@ -38,10 +40,59 @@ export async function POST(
   }
 
   try {
-    const scores = await espnProvider.getScores('')
+    // Primary: Slash Golf leaderboard, Fallback: ESPN
+    let scores: GolferScoreData[]
+    let source: 'slashgolf' | 'espn'
+
+    const todayKey = new Date().toISOString().slice(0, 10)
+    const monthKey = new Date().toISOString().slice(0, 7)
+
+    const [monthUsage, todayUsage] = await Promise.all([
+      supabase
+        .from('api_usage')
+        .select('*', { count: 'exact', head: true })
+        .eq('provider', 'slashgolf')
+        .eq('month_key', monthKey),
+      supabase
+        .from('api_usage')
+        .select('*', { count: 'exact', head: true })
+        .eq('provider', 'slashgolf')
+        .gte('called_at', `${todayKey}T00:00:00Z`)
+        .lt('called_at', `${todayKey}T23:59:59Z`),
+    ])
+
+    const monthCallsUsed = monthUsage.count || 0
+    const todayCallsUsed = todayUsage.count || 0
+    const hasSlashGolfBudget =
+      monthCallsUsed < MONTHLY_CALL_LIMIT && todayCallsUsed < DAILY_CALL_BUDGET
+
+    if (hasSlashGolfBudget) {
+      try {
+        scores = await slashGolfProvider.getLeaderboard()
+        source = 'slashgolf'
+
+        await supabase.from('api_usage').insert({
+          provider: 'slashgolf',
+          endpoint: 'leaderboard',
+          month_key: monthKey,
+        })
+
+        if (scores.length === 0) {
+          console.log('Slash Golf leaderboard returned empty, falling back to ESPN')
+          scores = await espnProvider.getScores('')
+          source = 'espn'
+        }
+      } catch (err) {
+        console.error('Slash Golf leaderboard error, falling back to ESPN:', err)
+        scores = await espnProvider.getScores('')
+        source = 'espn'
+      }
+    } else {
+      scores = await espnProvider.getScores('')
+      source = 'espn'
+    }
 
     for (const golfer of scores) {
-      // Upsert summary row (round_number = null)
       await supabase
         .from('golfer_scores')
         .upsert(
@@ -59,7 +110,6 @@ export async function POST(
           { onConflict: 'pool_id,golfer_id,round_number' }
         )
 
-      // Upsert per-round scores
       for (const round of golfer.rounds) {
         await supabase
           .from('golfer_scores')
@@ -80,7 +130,7 @@ export async function POST(
       }
     }
 
-    return NextResponse.json({ success: true, count: scores.length })
+    return NextResponse.json({ success: true, source, count: scores.length })
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to fetch scores' },
