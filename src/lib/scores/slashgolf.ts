@@ -138,14 +138,17 @@ export class SlashGolfProvider {
     const thru = this.parseThru(entry.thru)
 
     // Parse per-round scores
+    // API may return raw stroke counts (e.g. 68, 72) or to-par values (e.g. -4, 0, +1)
+    // Heuristic: values > 50 are raw strokes, values <= 50 are already to-par
     const rounds: { round_number: number; score_to_par: number }[] = []
     for (let r = 1; r <= 4; r++) {
       const roundKey = `round${r}` as keyof SlashGolfLeaderboardEntry
       const roundVal = entry[roundKey]
       if (roundVal !== undefined && roundVal !== null && roundVal !== '' && roundVal !== '--') {
-        const strokes = this.parseBsonInt(roundVal)
-        if (strokes !== null && strokes > 0) {
-          rounds.push({ round_number: r, score_to_par: strokes - 72 }) // Augusta par 72
+        const parsed = this.parseBsonInt(roundVal)
+        if (parsed !== null) {
+          const scoreToPar = parsed > 50 ? parsed - 72 : parsed // Augusta par 72
+          rounds.push({ round_number: r, score_to_par: scoreToPar })
         }
       }
     }
@@ -182,7 +185,7 @@ export class SlashGolfProvider {
   }
 
   private parseThru(val: unknown): number | null {
-    if (val === null || val === undefined || val === '' || val === '--' || val === 'F') return null
+    if (val === null || val === undefined || val === '' || val === '--') return null
     if (val === 'F' || val === 'f') return 18
     const n = this.parseBsonInt(val)
     return n !== null && n >= 0 ? n : null

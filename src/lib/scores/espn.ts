@@ -23,11 +23,15 @@ export class ESPNScoresProvider implements ScoresProvider {
     const data = await this.fetchLeaderboard(tournamentId)
     const competitors = this.extractCompetitors(data)
 
-    return competitors.map(c => ({
-      id: c.id,
-      name: c.athlete.displayName,
-      world_ranking: c.athlete.rank?.current || null,
-    }))
+    return competitors.map(c => {
+      const name = c.athlete.displayName
+      const id = name
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+      return { id, name, world_ranking: c.athlete.rank?.current || null }
+    })
   }
 
   async getScores(tournamentId: string): Promise<GolferScoreData[]> {
@@ -35,6 +39,14 @@ export class ESPNScoresProvider implements ScoresProvider {
     const competitors = this.extractCompetitors(data)
 
     return competitors.map(c => {
+      const name = c.athlete.displayName
+      // Generate slug ID matching our internal format (same as Slash Golf provider)
+      const golferId = name
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+
       const rounds = (c.linescores || []).map((ls, i) => ({
         round_number: i + 1,
         score_to_par: ls.value - 72, // Par 72 — adjust if your course differs
@@ -44,8 +56,8 @@ export class ESPNScoresProvider implements ScoresProvider {
       const status = this.mapStatus(c.status.type.name)
 
       return {
-        golfer_id: c.id,
-        golfer_name: c.athlete.displayName,
+        golfer_id: golferId,
+        golfer_name: name,
         rounds,
         total_to_par: totalToPar,
         thru_hole: c.status.thru || null,
