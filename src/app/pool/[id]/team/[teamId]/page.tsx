@@ -349,6 +349,11 @@ export default function TeamDetail() {
                     {holeScoresLoading[g.golfer_id] && (
                       <div className="px-4 py-2 text-xs text-muted-gray italic">Loading scorecard...</div>
                     )}
+                    {!holeScoresLoading[g.golfer_id] && roundScores.every(rs => rs === null) && (
+                      <div className="px-4 py-4 text-sm text-muted-gray text-center">
+                        No scorecard data available yet
+                      </div>
+                    )}
                     {roundScores.map((rs, roundIdx) => {
                       if (!rs) return null
                       const roundNum = roundIdx + 1
