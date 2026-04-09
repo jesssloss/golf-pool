@@ -31,8 +31,8 @@ export const SLASHGOLF_PLAYER_IDS: Record<string, string | null> = {
   'will-zalatoris': '47483',
   'max-homa': '35532',
   'adam-scott': '04330',
-  'brian-harman': '27644',
-  'jordan-spieth': '34046',
+  'brian-harman': null, // TODO: was duplicate of russell-henley (27644)
+  'jordan-spieth': null, // TODO: was duplicate of wyndham-clark (34046)
   'cameron-young': '50525',
   'dustin-johnson': '19846',
   'min-woo-lee': '47347',
