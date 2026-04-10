@@ -122,6 +122,13 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
       s.rank = currentRank
     })
 
+    // PRANK: Pull Joel to the top of the leaderboard display order
+    const joelIdx = teamStandings.findIndex(s => s.team.owner_name.toLowerCase().includes('joel'))
+    if (joelIdx > 0) {
+      const [joel] = teamStandings.splice(joelIdx, 1)
+      teamStandings.unshift(joel)
+    }
+
     // Track previous ranks for movement arrows (skip first load)
     if (!isFirstLoad.current) {
       const currentRanks: Record<string, number> = {}
@@ -472,61 +479,62 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
                   return scores.length > 0 ? scores.reduce((a, b) => a + b, 0) : null
                 })
 
+                // PRANK: detect Joel for special rendering
+                const isJoel = s.team.owner_name.toLowerCase().includes('joel')
+
                 return (
                   <tr
                     key={s.team.id}
                     onClick={() => router.push(teamUrl(s.team.id))}
-                    className={`border-b border-muted-gray/20 cursor-pointer hover:bg-pimento/5 transition-colors ${
+                    className={`border-b cursor-pointer hover:bg-pimento/5 transition-colors ${
+                      isJoel ? 'bg-gradient-to-r from-pink-50 via-yellow-50 to-cyan-50' :
                       isWinner ? 'bg-cheddar/10' :
                       isMe ? 'bg-pimento/5' :
                       idx % 2 === 0 ? 'bg-white' : 'bg-cream'
-                    }`}
+                    } ${isJoel ? 'border-transparent' : 'border-muted-gray/20'}`}
+                    style={isJoel ? {
+                      backgroundClip: 'padding-box',
+                      boxShadow: 'inset 0 2px 0 #ef4444, inset 0 -2px 0 #8b5cf6, inset 2px 0 0 #f59e0b, inset -2px 0 0 #3b82f6',
+                    } : undefined}
                   >
                     {/* PRANK: Joel gets a special participation rank */}
-                    {(() => {
-                      const isJoel = s.team.owner_name.toLowerCase().includes('joel')
-                      return (
-                        <>
-                          <td className="px-3 py-3 font-serif font-bold text-muted-gray">
-                            <div className="flex items-center gap-1">
-                              {isJoel ? <span>1<span className="text-[8px] align-super">*</span></span> : s.rank}
-                              {!isJoel && movement === 'up' && <span className="text-score-green text-[10px]">&#9650;</span>}
-                              {!isJoel && movement === 'down' && <span className="text-score-red text-[10px]">&#9660;</span>}
-                            </div>
-                          </td>
-                          <td className="px-3 py-3">
-                            <Link href={teamUrl(s.team.id)} className="hover:underline">
-                              <span className="font-serif font-semibold">
-                                {isWinner && <GreenJacketIcon size={16} />}
-                                {isJoel && <span className="mr-1">&#x1F37C;</span>}
-                                {' '}{s.team.owner_name}
-                                {isMe && <span className="ml-1 text-xs text-pimento/60">(you)</span>}
-                              </span>
-                            </Link>
-                            {isJoel && (
-                              <span className="ml-2 text-xs font-semibold text-cheddar">
-                                &#x1F3C6; Participation Award
-                              </span>
+                    <td className="px-3 py-3 font-serif font-bold text-muted-gray">
+                      <div className="flex items-center gap-1">
+                        {isJoel ? <span>1<span className="text-[8px] align-super">*</span></span> : s.rank}
+                        {!isJoel && movement === 'up' && <span className="text-score-green text-[10px]">&#9650;</span>}
+                        {!isJoel && movement === 'down' && <span className="text-score-red text-[10px]">&#9660;</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Link href={teamUrl(s.team.id)} className="hover:underline">
+                        <span className="font-serif font-semibold">
+                          {isWinner && <GreenJacketIcon size={16} />}
+                          {isJoel && <span className="mr-1">&#x1F37C;</span>}
+                          {' '}{s.team.owner_name}
+                          {isMe && <span className="ml-1 text-xs text-pimento/60">(you)</span>}
+                        </span>
+                      </Link>
+                      {isJoel && (
+                        <span className="ml-2 text-xs font-semibold text-cheddar">
+                          &#x1F3C6; Participation Award
+                        </span>
+                      )}
+                      {!isJoel && payout && (
+                        <span className="ml-2 text-xs font-semibold text-score-green">${payout}</span>
+                      )}
+                      {/* Inline golfer list */}
+                      <div className="mt-1 space-y-0.5">
+                        {s.golfers.map(g => (
+                          <div key={g.golfer_id} className={`text-xs flex items-center gap-1 ${g.is_dropped ? 'line-through text-muted-gray opacity-50' : ''}`}>
+                            <span className="truncate">{g.golfer_name}</span>
+                            {!g.is_dropped && g.status !== 'active' && (
+                              <StatusBadge status={g.status as 'cut' | 'withdrawn' | 'dq'} />
                             )}
-                            {!isJoel && payout && (
-                              <span className="ml-2 text-xs font-semibold text-score-green">${payout}</span>
-                            )}
-                            {/* Inline golfer list */}
-                            <div className="mt-1 space-y-0.5">
-                              {s.golfers.map(g => (
-                                <div key={g.golfer_id} className={`text-xs flex items-center gap-1 ${g.is_dropped ? 'line-through text-muted-gray opacity-50' : ''}`}>
-                                  <span className="truncate">{g.golfer_name}</span>
-                                  {!g.is_dropped && g.status !== 'active' && (
-                                    <StatusBadge status={g.status as 'cut' | 'withdrawn' | 'dq'} />
-                                  )}
-                                  {g.is_dropped && <StatusBadge status="dropped" />}
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                        </>
-                      )
-                    })()}
+                            {g.is_dropped && <StatusBadge status="dropped" />}
+                          </div>
+                        ))}
+                      </div>
+                    </td>
                     {roundTotals.map((rt, i) => (
                       <td key={i} className={`px-3 py-3 text-center font-mono ${rt !== null ? scoreColor(rt) : 'text-muted-gray'}`}>
                         {rt !== null ? <FlipScore value={formatScore(rt)} /> : '-'}
