@@ -245,7 +245,7 @@ export default function PublicTeamDetail() {
           <h1 className="text-2xl font-serif font-bold text-pimento">{team.owner_name}</h1>
         </div>
         <p className="text-sm text-muted-gray mb-4">
-          Best {pool.scoring_players} of {pool.players_per_team} golfers count &middot; {pool.tournament_name}
+          {pool.tournament_name}
         </p>
 
         {/* Golfer cards */}
