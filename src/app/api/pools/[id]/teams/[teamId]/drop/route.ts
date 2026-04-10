@@ -7,45 +7,54 @@ export async function POST(
   { params }: { params: { id: string; teamId: string } }
 ) {
   const cookieStore = cookies()
-  const sessionToken = cookieStore.get(`session_token_${params.id}`)?.value
+  const commissionerToken = cookieStore.get(`commissioner_token_${params.id}`)?.value
   const supabase = createServerSupabaseClient()
 
-  // Verify team ownership
-  const { data: team } = await supabase
-    .from('teams')
-    .select('*')
-    .eq('id', params.teamId)
-    .eq('session_token', sessionToken)
+  // Verify commissioner
+  const { data: pool } = await supabase
+    .from('pools')
+    .select('id, commissioner_token, players_per_team, scoring_players')
+    .eq('id', params.id)
     .single()
 
-  if (!team) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  if (!pool || pool.commissioner_token !== commissionerToken) {
+    return NextResponse.json({ error: 'Unauthorized — commissioner only' }, { status: 403 })
   }
 
-  // Check no drop already made
-  const { data: existingDrop } = await supabase
-    .from('team_golfers')
-    .select('id')
-    .eq('team_id', params.teamId)
-    .eq('is_dropped', true)
-    .single()
+  const { golferIds } = await request.json()
 
-  if (existingDrop) {
-    return NextResponse.json({ error: 'Already dropped a golfer' }, { status: 400 })
+  if (!Array.isArray(golferIds) || golferIds.length === 0) {
+    return NextResponse.json({ error: 'golferIds array required' }, { status: 400 })
   }
 
-  const { golferId } = await request.json()
+  const expectedDrops = pool.players_per_team - pool.scoring_players
+  if (golferIds.length !== expectedDrops) {
+    return NextResponse.json(
+      { error: `Must drop exactly ${expectedDrops} golfers` },
+      { status: 400 }
+    )
+  }
 
-  const { error } = await supabase
+  // Clear any previous drops for this team (allows commissioner to redo)
+  await supabase
     .from('team_golfers')
-    .update({ is_dropped: true, dropped_at: new Date().toISOString() })
+    .update({ is_dropped: false, dropped_at: null })
     .eq('pool_id', params.id)
     .eq('team_id', params.teamId)
-    .eq('golfer_id', golferId)
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  // Apply new drops
+  for (const golferId of golferIds) {
+    const { error } = await supabase
+      .from('team_golfers')
+      .update({ is_dropped: true, dropped_at: new Date().toISOString() })
+      .eq('pool_id', params.id)
+      .eq('team_id', params.teamId)
+      .eq('golfer_id', golferId)
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, dropped: golferIds })
 }

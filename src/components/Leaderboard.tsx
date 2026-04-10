@@ -12,6 +12,7 @@ import GreenJacketIcon from './GreenJacketIcon'
 import MilestoneBanner from './MilestoneBanner'
 import GreenJacketCard from './GreenJacketCard'
 import VictoryCard from './VictoryCard'
+import DropManager from './DropManager'
 import { calculatePayouts } from '@/lib/utils/ties'
 import type { Payment } from '@/types'
 
@@ -64,6 +65,8 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
     const allScores = scoresRes.data || []
     if (rulesRes.data) setPayoutRules(rulesRes.data)
 
+    const dropRound = pool.drop_deadline_round || 2
+
     const teamStandings: TeamStanding[] = teams.map(team => {
       const golfers = teamGolfers
         .filter(tg => tg.team_id === team.id)
@@ -85,10 +88,27 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
           return { ...tg, scores, total, status: latestStatus?.status || 'active' }
         })
 
-      const activeGolfers = golfers.filter(g => !g.is_dropped)
-      activeGolfers.sort((a, b) => a.total - b.total)
-      const scoringGolfers = activeGolfers.slice(0, pool.scoring_players)
-      const teamTotal = scoringGolfers.reduce((sum, g) => sum + g.total, 0)
+      // Round-aware scoring: before drop deadline all golfers count,
+      // after drop deadline only non-dropped golfers count.
+      let teamTotal = 0
+      for (let r = 1; r <= 4; r++) {
+        const eligibleGolfers = r <= dropRound
+          ? golfers
+          : golfers.filter(g => !g.is_dropped)
+
+        for (const g of eligibleGolfers) {
+          const roundScore = g.scores.find((s: any) => s.round_number === r)
+          if (roundScore && roundScore.score_to_par != null) {
+            teamTotal += roundScore.score_to_par
+          } else if (['cut', 'withdrawn', 'dq'].includes(g.status)) {
+            // Golfer missed this round: apply penalty
+            const playedRounds = g.scores.filter((s: any) => s.round_number !== null).map((s: any) => s.round_number)
+            if (!playedRounds.includes(r)) {
+              teamTotal += pool.missed_cut_score
+            }
+          }
+        }
+      }
 
       return { team, golfers, teamTotal, rank: 0 }
     })
@@ -431,13 +451,23 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
                 const movement = getMovement(s.team.id, s.rank)
                 const payout = getPayoutAmount(s.rank)
                 // Calculate team round totals from best scoring golfers
-                const activeGolfers = s.golfers.filter(g => !g.is_dropped)
-                activeGolfers.sort((a, b) => a.total - b.total)
-                const scoringGolfers = activeGolfers.slice(0, pool.scoring_players)
+                const dropRoundDisplay = pool.drop_deadline_round || 2
 
                 const roundTotals = [1, 2, 3, 4].map(r => {
-                  const scores = scoringGolfers
-                    .map(g => g.scores.find(sc => sc.round_number === r)?.score_to_par)
+                  const eligibleGolfers = r <= dropRoundDisplay
+                    ? s.golfers
+                    : s.golfers.filter(g => !g.is_dropped)
+                  const scores = eligibleGolfers
+                    .map(g => {
+                      const roundScore = g.scores.find((sc: any) => sc.round_number === r)?.score_to_par
+                      if (roundScore != null) return roundScore
+                      // Missed cut penalty for eligible golfers
+                      if (['cut', 'withdrawn', 'dq'].includes(g.status)) {
+                        const playedRounds = g.scores.filter((sc: any) => sc.round_number !== null).map((sc: any) => sc.round_number)
+                        if (!playedRounds.includes(r)) return pool.missed_cut_score
+                      }
+                      return undefined
+                    })
                     .filter((sc): sc is number => sc !== null && sc !== undefined)
                   return scores.length > 0 ? scores.reduce((a, b) => a + b, 0) : null
                 })
@@ -573,6 +603,16 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
             </div>
           )
         })()}
+
+        {/* Manage Drops — Commissioner only, active pool */}
+        {!readOnly && isCommissioner && pool.status === 'active' && (
+          <DropManager
+            poolId={poolId}
+            pool={pool}
+            standings={standings}
+            onDropsChanged={loadStandings}
+          />
+        )}
 
         {/* Mark Pool Complete — Commissioner only */}
         {!readOnly && isCommissioner && pool.status === 'active' && (
