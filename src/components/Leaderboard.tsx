@@ -219,7 +219,8 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
     const rule = payoutRules.find(r => r.position === position)
     if (!rule) return null
     const totalPot = pool.buy_in_amount * standings.length
-    return Math.round(totalPot * rule.percentage / 100)
+    const amount = Math.round(totalPot * rule.percentage / 100)
+    return amount > 0 ? amount : null
   }
 
   async function shareStandings() {
