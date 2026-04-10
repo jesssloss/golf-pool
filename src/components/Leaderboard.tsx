@@ -393,27 +393,41 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
             const isMe = currentTeam && s.team.id === currentTeam.id
             const movement = getMovement(s.team.id, s.rank)
             const payout = getPayoutAmount(s.rank)
+            // PRANK: detect Joel for mobile layout
+            const isJoelMobile = s.team.owner_name.toLowerCase().includes('joel')
 
             return (
               <Link key={s.team.id} href={teamUrl(s.team.id)}>
-                <div className={`rounded-sm p-3 border ${
-                  isWinner ? 'bg-cheddar/10 border-cheddar/40' :
-                  isMe ? 'bg-pimento/5 border-pimento/30' :
-                  'bg-white border-muted-gray/20'
-                }`}>
+                <div
+                  className={`rounded-sm p-3 border ${
+                    isJoelMobile ? 'bg-gradient-to-r from-pink-50 via-yellow-50 to-cyan-50 border-transparent' :
+                    isWinner ? 'bg-cheddar/10 border-cheddar/40' :
+                    isMe ? 'bg-pimento/5 border-pimento/30' :
+                    'bg-white border-muted-gray/20'
+                  }`}
+                  style={isJoelMobile ? {
+                    boxShadow: 'inset 0 2px 0 #ef4444, inset 0 -2px 0 #8b5cf6, inset 2px 0 0 #f59e0b, inset -2px 0 0 #3b82f6',
+                  } : undefined}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="font-serif font-bold text-muted-gray w-6">{s.rank}</span>
-                      {movement === 'up' && <span className="text-score-green text-xs">&#9650;</span>}
-                      {movement === 'down' && <span className="text-score-red text-xs">&#9660;</span>}
+                      <span className="font-serif font-bold text-muted-gray w-6">
+                        {isJoelMobile ? <span>1<span className="text-[8px] align-super">*</span></span> : s.rank}
+                      </span>
+                      {!isJoelMobile && movement === 'up' && <span className="text-score-green text-xs">&#9650;</span>}
+                      {!isJoelMobile && movement === 'down' && <span className="text-score-red text-xs">&#9660;</span>}
                       <span className="font-serif font-semibold">
                         {isWinner && <GreenJacketIcon size={16} />}
+                        {isJoelMobile && <span className="mr-1">&#x1F37C;</span>}
                         {' '}{s.team.owner_name}
                         {isMe && <span className="ml-1 text-xs text-pimento/60">(you)</span>}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
-                      {payout && (
+                      {isJoelMobile && (
+                        <span className="text-xs font-semibold text-cheddar">&#x1F3C6; Participation Award</span>
+                      )}
+                      {!isJoelMobile && payout && (
                         <span className="text-xs font-semibold text-score-green">${payout}</span>
                       )}
                       <span className={`font-mono font-bold ${scoreColor(s.teamTotal)}`}>
