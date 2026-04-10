@@ -97,12 +97,12 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
           : golfers.filter(g => !g.is_dropped)
 
         for (const g of eligibleGolfers) {
-          const roundScore = g.scores.find((s: any) => s.round_number === r)
+          const roundScore = g.scores.find((s: GolferScore) => s.round_number === r)
           if (roundScore && roundScore.score_to_par != null) {
             teamTotal += roundScore.score_to_par
           } else if (['cut', 'withdrawn', 'dq'].includes(g.status)) {
             // Golfer missed this round: apply penalty
-            const playedRounds = g.scores.filter((s: any) => s.round_number !== null).map((s: any) => s.round_number)
+            const playedRounds = g.scores.filter((s: GolferScore) => s.round_number !== null).map((s: GolferScore) => s.round_number)
             if (!playedRounds.includes(r)) {
               teamTotal += pool.missed_cut_score
             }
@@ -459,11 +459,11 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
                     : s.golfers.filter(g => !g.is_dropped)
                   const scores = eligibleGolfers
                     .map(g => {
-                      const roundScore = g.scores.find((sc: any) => sc.round_number === r)?.score_to_par
+                      const roundScore = g.scores.find((sc: GolferScore) => sc.round_number === r)?.score_to_par
                       if (roundScore != null) return roundScore
                       // Missed cut penalty for eligible golfers
                       if (['cut', 'withdrawn', 'dq'].includes(g.status)) {
-                        const playedRounds = g.scores.filter((sc: any) => sc.round_number !== null).map((sc: any) => sc.round_number)
+                        const playedRounds = g.scores.filter((sc: GolferScore) => sc.round_number !== null).map((sc: GolferScore) => sc.round_number)
                         if (!playedRounds.includes(r)) return pool.missed_cut_score
                       }
                       return undefined
