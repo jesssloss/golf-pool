@@ -97,24 +97,44 @@ export default function TeamDetail() {
   const [holeScoresLoading, setHoleScoresLoading] = useState<Record<string, boolean>>({})
 
   const loadData = useCallback(async () => {
-    const [poolRes, teamRes, tgRes, scoresRes] = await Promise.all([
+    const [poolRes, teamRes, tgRes, scoresRes, meRes] = await Promise.all([
       supabase.from('pools').select('id, name, tournament_name, invite_code, status, players_per_team, scoring_players, missed_cut_score, drop_deadline_round, draft_timer_seconds, draft_mode, buy_in_amount, payment_method, payment_details, created_at').eq('id', poolId).single(),
       supabase.from('teams').select('id, pool_id, owner_name, draft_position, is_commissioner, buy_in_paid, created_at').eq('id', teamId).single(),
       supabase.from('team_golfers').select('*').eq('pool_id', poolId).eq('team_id', teamId),
       supabase.from('golfer_scores').select('*').eq('pool_id', poolId),
+      fetch(`/api/pools/${poolId}/me`),
     ])
 
     if (poolRes.data) setPool(poolRes.data as Pool)
     if (teamRes.data) setTeam(teamRes.data as Team)
 
     if (tgRes.data && scoresRes.data) {
-      setGolfers(tgRes.data.map(tg => ({
+      const teamGolfers = tgRes.data
+      setGolfers(teamGolfers.map(tg => ({
         ...tg,
         scores: scoresRes.data!.filter(s => s.golfer_id === tg.golfer_id),
       })))
+
+      // Batch-fetch all hole scores for this team's golfers in one query
+      const golferIds = teamGolfers.map(tg => tg.golfer_id)
+      const { data: allHoleScores } = await supabase
+        .from('hole_scores')
+        .select('golfer_id, round_number, hole_number, par, score')
+        .eq('pool_id', poolId)
+        .in('golfer_id', golferIds)
+        .order('round_number')
+        .order('hole_number')
+
+      if (allHoleScores && allHoleScores.length > 0) {
+        const grouped: Record<string, CachedHoleScore[]> = {}
+        for (const hs of allHoleScores) {
+          if (!grouped[hs.golfer_id]) grouped[hs.golfer_id] = []
+          grouped[hs.golfer_id].push(hs)
+        }
+        setHoleScores(grouped)
+      }
     }
 
-    const meRes = await fetch(`/api/pools/${poolId}/me`)
     if (meRes.ok) {
       const data = await meRes.json()
       if (data.team) setCurrentTeam(data.team)

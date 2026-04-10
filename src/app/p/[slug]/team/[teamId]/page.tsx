@@ -108,10 +108,30 @@ export default function PublicTeamDetail() {
 
     if (teamRes.data) setTeam(teamRes.data as Team)
     if (tgRes.data && scoresRes.data) {
-      setGolfers(tgRes.data.map(tg => ({
+      const teamGolfers = tgRes.data
+      setGolfers(teamGolfers.map(tg => ({
         ...tg,
         scores: scoresRes.data!.filter(s => s.golfer_id === tg.golfer_id),
       })))
+
+      // Batch-fetch all hole scores for this team's golfers in one query
+      const golferIds = teamGolfers.map(tg => tg.golfer_id)
+      const { data: allHoleScores } = await supabase
+        .from('hole_scores')
+        .select('golfer_id, round_number, hole_number, par, score')
+        .eq('pool_id', poolData.id)
+        .in('golfer_id', golferIds)
+        .order('round_number')
+        .order('hole_number')
+
+      if (allHoleScores && allHoleScores.length > 0) {
+        const grouped: Record<string, CachedHoleScore[]> = {}
+        for (const hs of allHoleScores) {
+          if (!grouped[hs.golfer_id]) grouped[hs.golfer_id] = []
+          grouped[hs.golfer_id].push(hs)
+        }
+        setHoleScores(grouped)
+      }
     }
     setLoading(false)
   }, [slug, teamId, supabase])
