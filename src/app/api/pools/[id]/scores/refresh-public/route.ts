@@ -101,42 +101,45 @@ export async function POST(
     }
 
     // 2. Upsert scores to database
-    for (const golfer of scores) {
-      await supabase
-        .from('golfer_scores')
-        .upsert(
-          {
-            pool_id: poolId,
-            golfer_id: golfer.golfer_id,
-            golfer_name: golfer.golfer_name,
-            round_number: null,
-            total_to_par: golfer.total_to_par,
-            thru_hole: golfer.thru_hole,
-            status: golfer.status,
-            world_ranking: golfer.world_ranking,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'pool_id,golfer_id,round_number' }
-        )
+    // Delete all existing summary + round rows for this pool, then bulk insert.
+    // This avoids the NULL round_number upsert bug (PostgreSQL treats NULL != NULL
+    // so upsert with onConflict can't match summary rows, creating duplicates).
+    await supabase
+      .from('golfer_scores')
+      .delete()
+      .eq('pool_id', poolId)
 
-      for (const round of golfer.rounds) {
-        await supabase
-          .from('golfer_scores')
-          .upsert(
-            {
-              pool_id: poolId,
-              golfer_id: golfer.golfer_id,
-              golfer_name: golfer.golfer_name,
-              round_number: round.round_number,
-              score_to_par: round.score_to_par,
-              total_to_par: golfer.total_to_par,
-              status: golfer.status,
-              world_ranking: golfer.world_ranking,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'pool_id,golfer_id,round_number' }
-          )
+    const rows = scores.flatMap(golfer => {
+      const summary = {
+        pool_id: poolId,
+        golfer_id: golfer.golfer_id,
+        golfer_name: golfer.golfer_name,
+        round_number: null,
+        score_to_par: null as number | null,
+        total_to_par: golfer.total_to_par,
+        thru_hole: golfer.thru_hole,
+        status: golfer.status,
+        world_ranking: golfer.world_ranking,
+        updated_at: new Date().toISOString(),
       }
+      const rounds = golfer.rounds.map(round => ({
+        pool_id: poolId,
+        golfer_id: golfer.golfer_id,
+        golfer_name: golfer.golfer_name,
+        round_number: round.round_number,
+        score_to_par: round.score_to_par,
+        total_to_par: golfer.total_to_par,
+        thru_hole: null as number | null,
+        status: golfer.status,
+        world_ranking: golfer.world_ranking,
+        updated_at: new Date().toISOString(),
+      }))
+      return [summary, ...rounds]
+    })
+
+    // Batch insert in chunks of 500
+    for (let i = 0; i < rows.length; i += 500) {
+      await supabase.from('golfer_scores').insert(rows.slice(i, i + 500))
     }
 
     lastRefresh.set(poolId, now)
