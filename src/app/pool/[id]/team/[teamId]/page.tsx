@@ -255,7 +255,7 @@ export default function TeamDetail() {
           <h1 className="text-2xl font-serif font-bold text-pimento">{team.owner_name}</h1>
         </div>
         <p className="text-sm text-muted-gray mb-2">
-          Best {pool.scoring_players} of {pool.players_per_team} golfers count
+          {pool.tournament_name}
         </p>
 
         {/* Drop window milestone */}

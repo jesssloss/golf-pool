@@ -482,37 +482,51 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
                       idx % 2 === 0 ? 'bg-white' : 'bg-cream'
                     }`}
                   >
-                    <td className="px-3 py-3 font-serif font-bold text-muted-gray">
-                      <div className="flex items-center gap-1">
-                        {s.rank}
-                        {movement === 'up' && <span className="text-score-green text-[10px]">&#9650;</span>}
-                        {movement === 'down' && <span className="text-score-red text-[10px]">&#9660;</span>}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Link href={teamUrl(s.team.id)} className="hover:underline">
-                        <span className="font-serif font-semibold">
-                          {isWinner && <GreenJacketIcon size={16} />}
-                          {' '}{s.team.owner_name}
-                          {isMe && <span className="ml-1 text-xs text-pimento/60">(you)</span>}
-                        </span>
-                      </Link>
-                      {payout && (
-                        <span className="ml-2 text-xs font-semibold text-score-green">${payout}</span>
-                      )}
-                      {/* Inline golfer list */}
-                      <div className="mt-1 space-y-0.5">
-                        {s.golfers.map(g => (
-                          <div key={g.golfer_id} className={`text-xs flex items-center gap-1 ${g.is_dropped ? 'line-through text-muted-gray opacity-50' : ''}`}>
-                            <span className="truncate">{g.golfer_name}</span>
-                            {!g.is_dropped && g.status !== 'active' && (
-                              <StatusBadge status={g.status as 'cut' | 'withdrawn' | 'dq'} />
+                    {/* PRANK: Joel gets a special participation rank */}
+                    {(() => {
+                      const isJoel = s.team.owner_name.toLowerCase().includes('joel')
+                      return (
+                        <>
+                          <td className="px-3 py-3 font-serif font-bold text-muted-gray">
+                            <div className="flex items-center gap-1">
+                              {isJoel ? <span>1<span className="text-[8px] align-super">*</span></span> : s.rank}
+                              {!isJoel && movement === 'up' && <span className="text-score-green text-[10px]">&#9650;</span>}
+                              {!isJoel && movement === 'down' && <span className="text-score-red text-[10px]">&#9660;</span>}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            <Link href={teamUrl(s.team.id)} className="hover:underline">
+                              <span className="font-serif font-semibold">
+                                {isWinner && <GreenJacketIcon size={16} />}
+                                {isJoel && <span className="mr-1">&#x1F37C;</span>}
+                                {' '}{s.team.owner_name}
+                                {isMe && <span className="ml-1 text-xs text-pimento/60">(you)</span>}
+                              </span>
+                            </Link>
+                            {isJoel && (
+                              <span className="ml-2 text-xs font-semibold text-cheddar">
+                                &#x1F3C6; Participation Award
+                              </span>
                             )}
-                            {g.is_dropped && <StatusBadge status="dropped" />}
-                          </div>
-                        ))}
-                      </div>
-                    </td>
+                            {!isJoel && payout && (
+                              <span className="ml-2 text-xs font-semibold text-score-green">${payout}</span>
+                            )}
+                            {/* Inline golfer list */}
+                            <div className="mt-1 space-y-0.5">
+                              {s.golfers.map(g => (
+                                <div key={g.golfer_id} className={`text-xs flex items-center gap-1 ${g.is_dropped ? 'line-through text-muted-gray opacity-50' : ''}`}>
+                                  <span className="truncate">{g.golfer_name}</span>
+                                  {!g.is_dropped && g.status !== 'active' && (
+                                    <StatusBadge status={g.status as 'cut' | 'withdrawn' | 'dq'} />
+                                  )}
+                                  {g.is_dropped && <StatusBadge status="dropped" />}
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </>
+                      )
+                    })()}
                     {roundTotals.map((rt, i) => (
                       <td key={i} className={`px-3 py-3 text-center font-mono ${rt !== null ? scoreColor(rt) : 'text-muted-gray'}`}>
                         {rt !== null ? <FlipScore value={formatScore(rt)} /> : '-'}
@@ -527,6 +541,13 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
             </tbody>
           </table>
         </div>
+
+        {/* PRANK footnote */}
+        {standings.some(s => s.team.owner_name.toLowerCase().includes('joel')) && (
+          <div className="px-4 py-2 text-[10px] text-muted-gray italic">
+            *Participation Award for Outstanding Achievement in Complaining
+          </div>
+        )}
 
         {/* Victory Card for current user if they won a payout */}
         {isComplete && myStanding && (() => {
