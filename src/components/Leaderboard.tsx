@@ -65,7 +65,7 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
     const allScores = scoresRes.data || []
     if (rulesRes.data) setPayoutRules(rulesRes.data)
 
-    const dropRound = pool.drop_deadline_round || 2
+    const dropRound = pool.drop_deadline_round ?? 2
 
     const teamStandings: TeamStanding[] = teams.map(team => {
       const golfers = teamGolfers
@@ -453,7 +453,7 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
                 const movement = getMovement(s.team.id, s.rank)
                 const payout = getPayoutAmount(s.rank)
                 // Calculate team round totals from best scoring golfers
-                const dropRoundDisplay = pool.drop_deadline_round || 2
+                const dropRoundDisplay = pool.drop_deadline_round ?? 2
 
                 const roundTotals = [1, 2, 3, 4].map(r => {
                   const eligibleGolfers = r <= dropRoundDisplay
