@@ -11,7 +11,7 @@ const DROPS: Record<string, string[]> = {
   'Adam': ['robert-macintyre', 'nicolai-hojgaard'],
   'Jess': ['min-woo-lee', 'bryson-dechambeau'],
   'Joel': ['jj-spaun', 'kurt-kitayama'],
-  'Dan': ['russell-henley', 'thomas-novak'],
+  'Dan': ['russell-henley', 'andrew-novak'],
 }
 
 export async function POST(request: Request) {
