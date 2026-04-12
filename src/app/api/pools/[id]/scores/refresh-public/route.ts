@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { slashGolfProvider, MONTHLY_CALL_LIMIT, DAILY_CALL_BUDGET } from '@/lib/scores/slashgolf'
 import { espnProvider } from '@/lib/scores/espn'
 import type { GolferScoreData } from '@/types'
 
@@ -15,8 +14,7 @@ export async function POST(
   const poolId = params.id
   const supabase = createServerSupabaseClient()
 
-  // Database-backed rate limit (survives serverless cold starts)
-  // Combine with pool check in parallel to save time
+  // Parallel: rate limit check + pool existence check
   const [lastScoreRes, poolRes] = await Promise.all([
     supabase
       .from('golfer_scores')
@@ -41,8 +39,7 @@ export async function POST(
   }
 
   if (lastScoreRes.data) {
-    const lastUpdate = new Date(lastScoreRes.data.updated_at).getTime()
-    const elapsed = Date.now() - lastUpdate
+    const elapsed = Date.now() - new Date(lastScoreRes.data.updated_at).getTime()
     if (elapsed < REFRESH_INTERVAL_MS) {
       return NextResponse.json({
         success: true,
@@ -53,62 +50,15 @@ export async function POST(
   }
 
   try {
-    // 1. Fetch scores from external API (with 5s timeout on each call)
-    let scores: GolferScoreData[]
-    let source: 'slashgolf' | 'espn'
+    // Use ESPN only for public refresh (fast, no API key, no budget tracking).
+    // Slash Golf is used by the cron job which has a longer timeout budget.
+    const scores: GolferScoreData[] = await espnProvider.getScores('')
 
-    const todayKey = new Date().toISOString().slice(0, 10)
-    const monthKey = new Date().toISOString().slice(0, 7)
-
-    const [monthUsage, todayUsage] = await Promise.all([
-      supabase
-        .from('api_usage')
-        .select('*', { count: 'exact', head: true })
-        .eq('provider', 'slashgolf')
-        .eq('month_key', monthKey),
-      supabase
-        .from('api_usage')
-        .select('*', { count: 'exact', head: true })
-        .eq('provider', 'slashgolf')
-        .gte('called_at', `${todayKey}T00:00:00Z`)
-        .lt('called_at', `${todayKey}T23:59:59Z`),
-    ])
-
-    const monthCallsUsed = monthUsage.count || 0
-    const todayCallsUsed = todayUsage.count || 0
-    const hasSlashGolfBudget =
-      monthCallsUsed < MONTHLY_CALL_LIMIT && todayCallsUsed < DAILY_CALL_BUDGET
-
-    if (hasSlashGolfBudget) {
-      try {
-        scores = await slashGolfProvider.getLeaderboard()
-        source = 'slashgolf'
-
-        // Log API call (don't await - fire and forget)
-        supabase.from('api_usage').insert({
-          provider: 'slashgolf',
-          endpoint: 'leaderboard',
-          month_key: monthKey,
-        })
-
-        const hasRoundData = scores.some(s => s.rounds.length > 0)
-        if (scores.length === 0 || !hasRoundData) {
-          console.log('Slash Golf returned no round data, falling back to ESPN')
-          scores = await espnProvider.getScores('')
-          source = 'espn'
-        }
-      } catch (err) {
-        console.error('Slash Golf error, falling back to ESPN:', err)
-        scores = await espnProvider.getScores('')
-        source = 'espn'
-      }
-    } else {
-      scores = await espnProvider.getScores('')
-      source = 'espn'
+    if (scores.length === 0) {
+      return NextResponse.json({ success: true, source: 'espn', count: 0 })
     }
 
-    // 2. Write scores: insert new rows, then delete old ones.
-    // Insert-first so the table is never empty if we time out.
+    // Insert-then-delete: table is never empty if function times out
     const batchTimestamp = new Date().toISOString()
 
     const rows = scores.flatMap(golfer => {
@@ -120,21 +70,12 @@ export async function POST(
         world_ranking: golfer.world_ranking,
         updated_at: batchTimestamp,
       }
-      const summary = {
-        ...base,
-        round_number: null,
-        score_to_par: null as number | null,
-        total_to_par: golfer.total_to_par,
-        thru_hole: golfer.thru_hole,
-      }
-      const rounds = golfer.rounds.map(round => ({
-        ...base,
-        round_number: round.round_number,
-        score_to_par: round.score_to_par,
-        total_to_par: golfer.total_to_par,
-        thru_hole: null as number | null,
-      }))
-      return [summary, ...rounds]
+      return [
+        { ...base, round_number: null, score_to_par: null as number | null, total_to_par: golfer.total_to_par, thru_hole: golfer.thru_hole },
+        ...golfer.rounds.map(round => ({
+          ...base, round_number: round.round_number, score_to_par: round.score_to_par, total_to_par: golfer.total_to_par, thru_hole: null as number | null,
+        })),
+      ]
     })
 
     // Parallel batch insert
@@ -144,7 +85,7 @@ export async function POST(
     }
     await Promise.all(batches)
 
-    // Delete old rows (don't await - cleanup can happen async)
+    // Clean up old rows (fire-and-forget)
     supabase
       .from('golfer_scores')
       .delete()
@@ -152,11 +93,7 @@ export async function POST(
       .lt('updated_at', batchTimestamp)
       .then(() => {})
 
-    return NextResponse.json({
-      success: true,
-      source,
-      count: scores.length,
-    })
+    return NextResponse.json({ success: true, source: 'espn', count: scores.length })
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to fetch scores' },
