@@ -14,51 +14,43 @@ export async function POST(
   const poolId = params.id
   const supabase = createServerSupabaseClient()
 
-  // Parallel: rate limit check + pool existence check
-  const [lastScoreRes, poolRes] = await Promise.all([
-    supabase
-      .from('golfer_scores')
-      .select('updated_at')
-      .eq('pool_id', poolId)
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .single(),
-    supabase
-      .from('pools')
-      .select('id, status')
-      .eq('id', poolId)
-      .single(),
-  ])
+  // Rate limit check with timeout - if Supabase is slow, skip and return
+  try {
+    const rateCheck = await Promise.race([
+      supabase
+        .from('golfer_scores')
+        .select('updated_at')
+        .eq('pool_id', poolId)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+    ])
 
-  if (!poolRes.data) {
-    return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
-  }
-
-  if (poolRes.data.status !== 'active') {
-    return NextResponse.json({ success: true, message: 'Pool not active' })
-  }
-
-  if (lastScoreRes.data) {
-    const elapsed = Date.now() - new Date(lastScoreRes.data.updated_at).getTime()
-    if (elapsed < REFRESH_INTERVAL_MS) {
-      return NextResponse.json({
-        success: true,
-        cached: true,
-        nextRefreshIn: Math.ceil((REFRESH_INTERVAL_MS - elapsed) / 1000),
-      })
+    if (rateCheck && 'data' in rateCheck && rateCheck.data) {
+      const elapsed = Date.now() - new Date(rateCheck.data.updated_at).getTime()
+      if (elapsed < REFRESH_INTERVAL_MS) {
+        return NextResponse.json({
+          success: true,
+          cached: true,
+          nextRefreshIn: Math.ceil((REFRESH_INTERVAL_MS - elapsed) / 1000),
+        })
+      }
     }
+  } catch {
+    // Supabase unreachable - continue without rate limit
+    console.error('Rate limit check failed, continuing')
   }
 
   try {
-    // Use ESPN only for public refresh (fast, no API key, no budget tracking).
-    // Slash Golf is used by the cron job which has a longer timeout budget.
+    // Use ESPN only (fast, no API key, no budget tracking)
     const scores: GolferScoreData[] = await espnProvider.getScores('')
 
     if (scores.length === 0) {
       return NextResponse.json({ success: true, source: 'espn', count: 0 })
     }
 
-    // Insert-then-delete: table is never empty if function times out
+    // Try to write to DB with timeout - don't block response if Supabase is slow
     const batchTimestamp = new Date().toISOString()
 
     const rows = scores.flatMap(golfer => {
@@ -78,14 +70,19 @@ export async function POST(
       ]
     })
 
-    // Parallel batch insert
+    // Fire DB writes without awaiting - don't block response
     const batches = []
     for (let i = 0; i < rows.length; i += 500) {
       batches.push(supabase.from('golfer_scores').insert(rows.slice(i, i + 500)))
     }
-    await Promise.all(batches)
 
-    // Clean up old rows (fire-and-forget)
+    // Wait up to 5s for inserts, then return regardless
+    await Promise.race([
+      Promise.all(batches),
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+    ])
+
+    // Fire-and-forget cleanup
     supabase
       .from('golfer_scores')
       .delete()
