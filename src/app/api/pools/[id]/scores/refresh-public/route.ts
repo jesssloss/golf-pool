@@ -5,8 +5,6 @@ import { espnProvider } from '@/lib/scores/espn'
 import { SLASHGOLF_PLAYER_IDS } from '@/lib/data/slashgolf-ids'
 import type { GolferScoreData } from '@/types'
 
-// Simple in-memory rate limit: one refresh per pool per 2 minutes
-const lastRefresh = new Map<string, number>()
 const REFRESH_INTERVAL_MS = 2 * 60 * 1000
 
 export async function POST(
@@ -14,18 +12,28 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   const poolId = params.id
-  const now = Date.now()
-  const last = lastRefresh.get(poolId) || 0
-
-  if (now - last < REFRESH_INTERVAL_MS) {
-    return NextResponse.json({
-      success: true,
-      cached: true,
-      nextRefreshIn: Math.ceil((REFRESH_INTERVAL_MS - (now - last)) / 1000),
-    })
-  }
-
   const supabase = createServerSupabaseClient()
+
+  // Database-backed rate limit (survives serverless cold starts)
+  const { data: lastScoreRow } = await supabase
+    .from('golfer_scores')
+    .select('updated_at')
+    .eq('pool_id', poolId)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (lastScoreRow) {
+    const lastUpdate = new Date(lastScoreRow.updated_at).getTime()
+    const elapsed = Date.now() - lastUpdate
+    if (elapsed < REFRESH_INTERVAL_MS) {
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        nextRefreshIn: Math.ceil((REFRESH_INTERVAL_MS - elapsed) / 1000),
+      })
+    }
+  }
 
   // Verify pool exists and is active
   const { data: pool } = await supabase
@@ -141,8 +149,6 @@ export async function POST(
     for (let i = 0; i < rows.length; i += 500) {
       await supabase.from('golfer_scores').insert(rows.slice(i, i + 500))
     }
-
-    lastRefresh.set(poolId, now)
 
     // 3. Proactively fetch hole-by-hole scores for drafted golfers
     let holeScoresFetched = 0
