@@ -6,6 +6,8 @@ import type { GolferScoreData } from '@/types'
 
 const REFRESH_INTERVAL_MS = 2 * 60 * 1000
 
+export const maxDuration = 15
+
 export async function POST(
   _request: NextRequest,
   { params }: { params: { id: string } }
@@ -14,16 +16,32 @@ export async function POST(
   const supabase = createServerSupabaseClient()
 
   // Database-backed rate limit (survives serverless cold starts)
-  const { data: lastScoreRow } = await supabase
-    .from('golfer_scores')
-    .select('updated_at')
-    .eq('pool_id', poolId)
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .single()
+  // Combine with pool check in parallel to save time
+  const [lastScoreRes, poolRes] = await Promise.all([
+    supabase
+      .from('golfer_scores')
+      .select('updated_at')
+      .eq('pool_id', poolId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .single(),
+    supabase
+      .from('pools')
+      .select('id, status')
+      .eq('id', poolId)
+      .single(),
+  ])
 
-  if (lastScoreRow) {
-    const lastUpdate = new Date(lastScoreRow.updated_at).getTime()
+  if (!poolRes.data) {
+    return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
+  }
+
+  if (poolRes.data.status !== 'active') {
+    return NextResponse.json({ success: true, message: 'Pool not active' })
+  }
+
+  if (lastScoreRes.data) {
+    const lastUpdate = new Date(lastScoreRes.data.updated_at).getTime()
     const elapsed = Date.now() - lastUpdate
     if (elapsed < REFRESH_INTERVAL_MS) {
       return NextResponse.json({
@@ -34,23 +52,8 @@ export async function POST(
     }
   }
 
-  // Verify pool exists and is active
-  const { data: pool } = await supabase
-    .from('pools')
-    .select('id, status')
-    .eq('id', poolId)
-    .single()
-
-  if (!pool) {
-    return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
-  }
-
-  if (pool.status !== 'active') {
-    return NextResponse.json({ success: true, message: 'Pool not active' })
-  }
-
   try {
-    // 1. Fetch scores from external API
+    // 1. Fetch scores from external API (with 5s timeout on each call)
     let scores: GolferScoreData[]
     let source: 'slashgolf' | 'espn'
 
@@ -81,7 +84,8 @@ export async function POST(
         scores = await slashGolfProvider.getLeaderboard()
         source = 'slashgolf'
 
-        await supabase.from('api_usage').insert({
+        // Log API call (don't await - fire and forget)
+        supabase.from('api_usage').insert({
           provider: 'slashgolf',
           endpoint: 'leaderboard',
           month_key: monthKey,
@@ -89,12 +93,12 @@ export async function POST(
 
         const hasRoundData = scores.some(s => s.rounds.length > 0)
         if (scores.length === 0 || !hasRoundData) {
-          console.log('Slash Golf leaderboard returned no round data, falling back to ESPN')
+          console.log('Slash Golf returned no round data, falling back to ESPN')
           scores = await espnProvider.getScores('')
           source = 'espn'
         }
       } catch (err) {
-        console.error('Slash Golf leaderboard error, falling back to ESPN:', err)
+        console.error('Slash Golf error, falling back to ESPN:', err)
         scores = await espnProvider.getScores('')
         source = 'espn'
       }
@@ -103,50 +107,50 @@ export async function POST(
       source = 'espn'
     }
 
-    // 2. Write scores to database using insert-then-delete pattern
-    // This avoids the window where scores are empty (delete-first can leave
-    // the table empty if the function times out before inserting).
+    // 2. Write scores: insert new rows, then delete old ones.
+    // Insert-first so the table is never empty if we time out.
     const batchTimestamp = new Date().toISOString()
 
     const rows = scores.flatMap(golfer => {
-      const summary = {
+      const base = {
         pool_id: poolId,
         golfer_id: golfer.golfer_id,
         golfer_name: golfer.golfer_name,
-        round_number: null,
-        score_to_par: null as number | null,
-        total_to_par: golfer.total_to_par,
-        thru_hole: golfer.thru_hole,
         status: golfer.status,
         world_ranking: golfer.world_ranking,
         updated_at: batchTimestamp,
       }
+      const summary = {
+        ...base,
+        round_number: null,
+        score_to_par: null as number | null,
+        total_to_par: golfer.total_to_par,
+        thru_hole: golfer.thru_hole,
+      }
       const rounds = golfer.rounds.map(round => ({
-        pool_id: poolId,
-        golfer_id: golfer.golfer_id,
-        golfer_name: golfer.golfer_name,
+        ...base,
         round_number: round.round_number,
         score_to_par: round.score_to_par,
         total_to_par: golfer.total_to_par,
         thru_hole: null as number | null,
-        status: golfer.status,
-        world_ranking: golfer.world_ranking,
-        updated_at: batchTimestamp,
       }))
       return [summary, ...rounds]
     })
 
-    // Insert new rows first
+    // Parallel batch insert
+    const batches = []
     for (let i = 0; i < rows.length; i += 500) {
-      await supabase.from('golfer_scores').insert(rows.slice(i, i + 500))
+      batches.push(supabase.from('golfer_scores').insert(rows.slice(i, i + 500)))
     }
+    await Promise.all(batches)
 
-    // Then delete old rows (anything with updated_at before this batch)
-    await supabase
+    // Delete old rows (don't await - cleanup can happen async)
+    supabase
       .from('golfer_scores')
       .delete()
       .eq('pool_id', poolId)
       .lt('updated_at', batchTimestamp)
+      .then(() => {})
 
     return NextResponse.json({
       success: true,

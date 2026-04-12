@@ -5,6 +5,8 @@ import { espnProvider } from '@/lib/scores/espn'
 import { SLASHGOLF_PLAYER_IDS } from '@/lib/data/slashgolf-ids'
 import type { GolferScoreData } from '@/types'
 
+export const maxDuration = 30
+
 export async function GET(request: NextRequest) {
   // Verify cron secret to prevent unauthorized calls
   const authHeader = request.headers.get('authorization')
@@ -83,44 +85,49 @@ export async function GET(request: NextRequest) {
     }
 
     for (const pool of pools) {
-      // Delete all existing rows for this pool, then bulk insert.
-      // Avoids NULL round_number upsert bug (PostgreSQL NULL != NULL).
-      await supabase
-        .from('golfer_scores')
-        .delete()
-        .eq('pool_id', pool.id)
+      // Insert new rows first, then delete old ones.
+      // Insert-first so the table is never empty if we time out.
+      const batchTimestamp = new Date().toISOString()
 
       const rows = scores.flatMap(golfer => {
-        const summary = {
+        const base = {
           pool_id: pool.id,
           golfer_id: golfer.golfer_id,
           golfer_name: golfer.golfer_name,
+          status: golfer.status,
+          world_ranking: golfer.world_ranking,
+          updated_at: batchTimestamp,
+        }
+        const summary = {
+          ...base,
           round_number: null,
           score_to_par: null as number | null,
           total_to_par: golfer.total_to_par,
           thru_hole: golfer.thru_hole,
-          status: golfer.status,
-          world_ranking: golfer.world_ranking,
-          updated_at: new Date().toISOString(),
         }
         const rounds = golfer.rounds.map(round => ({
-          pool_id: pool.id,
-          golfer_id: golfer.golfer_id,
-          golfer_name: golfer.golfer_name,
+          ...base,
           round_number: round.round_number,
           score_to_par: round.score_to_par,
           total_to_par: golfer.total_to_par,
           thru_hole: null as number | null,
-          status: golfer.status,
-          world_ranking: golfer.world_ranking,
-          updated_at: new Date().toISOString(),
         }))
         return [summary, ...rounds]
       })
 
+      // Parallel batch insert
+      const batches = []
       for (let i = 0; i < rows.length; i += 500) {
-        await supabase.from('golfer_scores').insert(rows.slice(i, i + 500))
+        batches.push(supabase.from('golfer_scores').insert(rows.slice(i, i + 500)))
       }
+      await Promise.all(batches)
+
+      // Delete old rows
+      await supabase
+        .from('golfer_scores')
+        .delete()
+        .eq('pool_id', pool.id)
+        .lt('updated_at', batchTimestamp)
 
       // Proactively fetch hole-by-hole scores for drafted golfers
       if (source === 'slashgolf') {

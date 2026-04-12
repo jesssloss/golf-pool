@@ -100,7 +100,10 @@ export class SlashGolfProvider {
 
     const url = `${BASE_URL}/leaderboard?orgId=${orgId}&tournId=${tournId}&year=${year}`
 
-    const res = await fetch(url, { headers: this.headers })
+    const res = await fetch(url, {
+      headers: this.headers,
+      signal: AbortSignal.timeout(5000),
+    })
 
     if (!res.ok) {
       throw new Error(`Slash Golf leaderboard API error: ${res.status}`)
@@ -230,7 +233,10 @@ export class SlashGolfProvider {
 
     const url = `${BASE_URL}/scorecard?orgId=${orgId}&tournId=${tournId}&year=${year}&playerId=${playerId}`
 
-    const res = await fetch(url, { headers: this.headers })
+    const res = await fetch(url, {
+      headers: this.headers,
+      signal: AbortSignal.timeout(5000),
+    })
 
     if (!res.ok) {
       throw new Error(`Slash Golf API error: ${res.status}`)

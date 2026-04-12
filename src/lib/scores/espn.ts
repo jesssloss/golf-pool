@@ -81,7 +81,10 @@ export class ESPNScoresProvider implements ScoresProvider {
       ? `${ESPN_LEADERBOARD_URL}?event=${tournamentId}`
       : ESPN_LEADERBOARD_URL
 
-    const res = await fetch(url, { next: { revalidate: 60 } })
+    const res = await fetch(url, {
+      next: { revalidate: 60 },
+      signal: AbortSignal.timeout(5000),
+    })
     if (!res.ok) {
       throw new Error(`ESPN API error: ${res.status}`)
     }
