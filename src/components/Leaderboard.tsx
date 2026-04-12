@@ -182,14 +182,23 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
   }, [poolId, readOnly])
 
   // Realtime subscription for instant updates when cron writes scores
+  // Debounce to avoid re-rendering on every row during bulk delete+insert
+  const realtimeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
+    const debouncedLoad = () => {
+      if (realtimeTimer.current) clearTimeout(realtimeTimer.current)
+      realtimeTimer.current = setTimeout(() => loadStandings(), 2000)
+    }
     const channel = supabase
       .channel('scores-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'golfer_scores', filter: `pool_id=eq.${poolId}` }, () => loadStandings())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_golfers', filter: `pool_id=eq.${poolId}` }, () => loadStandings())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'golfer_scores', filter: `pool_id=eq.${poolId}` }, debouncedLoad)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_golfers', filter: `pool_id=eq.${poolId}` }, debouncedLoad)
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      if (realtimeTimer.current) clearTimeout(realtimeTimer.current)
+      supabase.removeChannel(channel)
+    }
   }, [poolId, supabase, loadStandings])
 
   // Auto-refresh: pull fresh ESPN scores every 2 min for active pools
@@ -199,14 +208,13 @@ export default function Leaderboard({ poolId, pool, readOnly = false }: Props) {
 
   useEffect(() => {
     if (pool.status !== 'active') return
-    // Fire immediately on mount, then every 2 minutes
-    fetch(refreshUrl, { method: 'POST' }).then(() => loadStandings())
-    const interval = setInterval(async () => {
-      await fetch(refreshUrl, { method: 'POST' })
-      loadStandings()
+    // Fire in background on mount, don't block page render
+    fetch(refreshUrl, { method: 'POST' })
+    const interval = setInterval(() => {
+      fetch(refreshUrl, { method: 'POST' })
     }, 120_000)
     return () => clearInterval(interval)
-  }, [pool.status, poolId, loadStandings, refreshUrl])
+  }, [pool.status, poolId, refreshUrl])
 
   const handleManualRefresh = async () => {
     setRefreshing(true)
