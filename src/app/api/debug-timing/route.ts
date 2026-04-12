@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { espnProvider } from '@/lib/scores/espn'
 
+export const dynamic = 'force-dynamic'
 export const maxDuration = 15
 
 export async function GET() {
@@ -36,7 +37,7 @@ export async function GET() {
     const scores = await espnProvider.getScores('')
     timings['espn_api'] = Date.now() - t3
     timings['espn_golfer_count'] = scores.length
-  } catch (err) {
+  } catch {
     timings['espn_api'] = Date.now() - t3
     timings['espn_error'] = -1
   }
